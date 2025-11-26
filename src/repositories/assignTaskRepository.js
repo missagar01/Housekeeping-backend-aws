@@ -52,13 +52,14 @@ class AssignTaskRepository {
       return this.createInMemory(input);
     }
     const now = new Date().toISOString();
+    const submissionDate = input.submission_date ?? null;
 
     const seqResult = await query(
       "SELECT nextval(pg_get_serial_sequence('assign_task','id')) AS id"
     );
     const id = seqResult.rows[0].id;
     const taskId = String(id);
-    const computedDelay = computeDelay(input.task_start_date, input.submission_date);
+    const computedDelay = computeDelay(input.task_start_date, submissionDate);
 
     const sql = `
       INSERT INTO assign_task (
@@ -88,7 +89,7 @@ class AssignTaskRepository {
       input.attachment || null,
       input.frequency || null,
       input.task_start_date || null,
-      input.submission_date || null,
+      submissionDate,
       input.delay ?? computedDelay,
       input.remainder || null,
       now
@@ -106,10 +107,12 @@ class AssignTaskRepository {
     const existing = await this.findById(id);
     if (!existing) return null;
 
-    const computedDelay = computeDelay(
-      input.task_start_date ?? existing.task_start_date,
-      input.submission_date ?? existing.submission_date
-    );
+    const submissionDate =
+      input.submission_date !== undefined
+        ? input.submission_date
+        : new Date().toISOString();
+    const taskStartDate = input.task_start_date ?? existing.task_start_date;
+    const computedDelay = computeDelay(taskStartDate, submissionDate);
 
     const fields = [
       'department',
@@ -139,6 +142,12 @@ class AssignTaskRepository {
         params.push(value);
       }
     });
+
+    // ensure submission_date is set to "now" when not provided
+    if (!Object.prototype.hasOwnProperty.call(input, 'submission_date')) {
+      setClauses.push(`submission_date = $${params.length + 1}`);
+      params.push(submissionDate);
+    }
 
     // ensure delay updates when dates change even if delay not explicitly provided
     if (!Object.prototype.hasOwnProperty.call(input, 'delay') && computedDelay !== null) {
@@ -174,7 +183,8 @@ class AssignTaskRepository {
   async createInMemory(input) {
     const now = new Date().toISOString();
     const id = this.nextId++;
-    const computedDelay = computeDelay(input.task_start_date, input.submission_date);
+    const submissionDate = input.submission_date ?? null;
+    const computedDelay = computeDelay(input.task_start_date, submissionDate);
     const record = {
       id,
       task_id: String(id),
@@ -188,7 +198,7 @@ class AssignTaskRepository {
       attachment: input.attachment || null,
       frequency: input.frequency || null,
       task_start_date: input.task_start_date || null,
-      submission_date: input.submission_date || null,
+      submission_date: submissionDate,
       delay: input.delay ?? computedDelay,
       remainder: input.remainder || null,
       created_at: now
@@ -201,6 +211,9 @@ class AssignTaskRepository {
     const idx = this.records.findIndex((r) => String(r.id) === String(id));
     if (idx === -1) return null;
     const base = { ...this.records[idx], ...input };
+    if (input.submission_date === undefined) {
+      base.submission_date = new Date().toISOString();
+    }
     const computedDelay = computeDelay(base.task_start_date, base.submission_date);
     if (computedDelay !== null) {
       base.delay = computedDelay;

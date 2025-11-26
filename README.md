@@ -57,18 +57,32 @@ npm start     # node src/server.js
 ## API
 Base path: `/api`
 
-### POST /api/assignments
-- Required body: `department`, `name`, `task_description`
-- Optional: `given_by`, `remark`, `status`, `image`, `attachment`, `frequency`, `task_start_date`, `submission_date`, `delay`, `remainder`
-- Auto-generated: `id`, `task_id`, `created_at`
+### Working Days
+- `GET /api/working-days` — rows from `working_day`.
 
-Example request:
+### Assign Tasks (CRUD + Bulk)
+- `GET /api/assigntask` — list all.
+- `GET /api/assigntask/:id` — fetch one.
+- `POST /api/assigntask` — create one (JSON or multipart with `image` file).
+- `PUT /api/assigntask/:id` — update one (partial fields allowed).
+- `DELETE /api/assigntask/:id` — delete one.
+- `POST /api/assigntask/bulk` — create many in one request (array body; multipart allowed with shared `image`).
+
+Required fields: `department`, `name`, `task_description`
+
+Optional fields: `given_by`, `remark`, `status`, `image`, `attachment`, `frequency`, `task_start_date`, `submission_date`, `delay` (auto-computed when both dates provided), `remainder`
+
+Auto fields: `id`, `task_id`, `created_at`
+
+Example request (JSON):
 ```json
 {
   "department": "Maintenance",
   "name": "John Doe",
   "task_description": "Clean lobby",
-  "frequency": "daily"
+  "frequency": "daily",
+  "task_start_date": "2025-12-27T18:30:00.000Z",
+  "submission_date": "2026-01-02T18:30:00.000Z"
 }
 ```
 
@@ -76,7 +90,7 @@ Example success response:
 ```json
 {
   "id": 1,
-  "task_id": "TASK-000001",
+  "task_id": "1",
   "department": "Maintenance",
   "given_by": null,
   "name": "John Doe",
@@ -86,9 +100,9 @@ Example success response:
   "image": null,
   "attachment": null,
   "frequency": "daily",
-  "task_start_date": null,
-  "submission_date": null,
-  "delay": null,
+  "task_start_date": "2025-12-27T18:30:00.000Z",
+  "submission_date": "2026-01-02T18:30:00.000Z",
+  "delay": 6,
   "remainder": null,
   "created_at": "2025-11-26T08:00:00.000Z"
 }
@@ -106,6 +120,12 @@ Validation errors return HTTP 400 with details.
 npm test
 ```
 Tests hit the Express app in-memory and do not require a database.
+
+## Postman tips
+- For JSON: set `Content-Type: application/json`.
+- For file upload: use `form-data`, field `image` (file), other text fields as needed.
+- CRUD: add/update/delete/get on `/api/assigntask`; bulk insert at `/api/assigntask/bulk`; working days at `/api/working-days`.
+- Delay is auto-calculated when both `task_start_date` and `submission_date` are provided (difference in days, never negative).
 
 ## Notes
 - PostgreSQL connection is configured in `config/db.js`; it is skipped in tests and uses SSL when `PG_SSL=true`.

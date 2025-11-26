@@ -1,27 +1,5 @@
 const { z } = require('zod');
 
-const normalizeDate = (value) => {
-  if (value === undefined || value === null || value === '') return undefined;
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    return value.toISOString().slice(0, 10);
-  }
-  if (typeof value === 'string') {
-    const parsed = new Date(value);
-    if (!Number.isNaN(parsed.getTime())) {
-      return parsed.toISOString().slice(0, 10);
-    }
-    return value; // let regex validation handle bad formats
-  }
-  return undefined;
-};
-
-const dateSchema = z.preprocess(
-  normalizeDate,
-  z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/, 'date must be YYYY-MM-DD')
-);
-
 const assignTaskSchema = z.object({
   department: z.string().min(1, 'department is required'),
   name: z.string().min(1, 'name is required'),
@@ -32,8 +10,9 @@ const assignTaskSchema = z.object({
   image: z.string().optional(),
   attachment: z.string().optional(),
   frequency: z.string().optional(),
-  task_start_date: dateSchema.optional(),
-  submission_date: dateSchema.optional(),
+  // Accept raw date/time strings; DB will store as DATE, delay uses JS Date parsing.
+  task_start_date: z.string().optional(),
+  submission_date: z.string().optional(),
   delay: z.number().int().optional(),
   remainder: z.string().optional()
 });

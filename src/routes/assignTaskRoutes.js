@@ -73,6 +73,13 @@ router.post(
   assignTaskController.bulkCreate
 );
 
+router.post(
+  '/generate',
+  upload.single('image'),
+  normalizeBody,
+  assignTaskController.generateFromWorkingDays
+);
+
 router
   .route('/:id')
   .get(assignTaskController.getById)

@@ -1,7 +1,8 @@
 const { ApiError } = require('./errorHandler');
 
 const validateBody = (schema) => (req, _res, next) => {
-  const result = schema.safeParse(req.body);
+  const input = req.body === undefined ? {} : req.body;
+  const result = schema.safeParse(input);
   if (!result.success) {
     return next(new ApiError(400, 'Validation failed', result.error.format()));
   }

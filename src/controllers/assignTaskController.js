@@ -20,6 +20,15 @@ const assignTaskController = {
     }
   },
 
+  async generateFromWorkingDays(req, res, next) {
+    try {
+      const created = await assignTaskService.generateFromWorkingDays(req.body || {});
+      res.status(201).json({ count: created.length, items: created });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async list(_req, res, next) {
     try {
       const items = await assignTaskService.list();
