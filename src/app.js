@@ -20,6 +20,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(requestLogger);
 app.use('/uploads', express.static(uploadsDir));
+// Also expose uploads under /api/uploads for convenience
+app.use('/api/uploads', express.static(uploadsDir));
 
 app.use('/api', routes);
 

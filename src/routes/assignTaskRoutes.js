@@ -6,7 +6,8 @@ const { assignTaskController } = require('../controllers/assignTaskController');
 const { validateBody } = require('../middleware/validate');
 const { assignTaskSchema, updateAssignTaskSchema } = require('../models/assignTask');
 
-const uploadsDir = path.join(__dirname, '..', 'uploads');
+// Use the project-level uploads directory (same as app.js)
+const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
   fs.mkdirSync(uploadsDir, { recursive: true });
 }
@@ -38,7 +39,8 @@ const normalizeItem = (item, file) => {
   }
 
   if (file) {
-    item.image = `/uploads/${file.filename}`;
+    // Prefer /api/uploads so the URL works with the API base path
+    item.image = `/api/uploads/${file.filename}`;
   }
 
   // Fix common key typos from clients
