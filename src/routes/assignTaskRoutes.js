@@ -4,11 +4,7 @@ const fs = require('fs');
 const { Router } = require('express');
 const { assignTaskController } = require('../controllers/assignTaskController');
 const { validateBody } = require('../middleware/validate');
-const {
-  assignTaskSchema,
-  assignTaskListSchema,
-  updateAssignTaskSchema
-} = require('../models/assignTask');
+const { assignTaskSchema, updateAssignTaskSchema } = require('../models/assignTask');
 
 const uploadsDir = path.join(__dirname, '..', 'uploads');
 if (!fs.existsSync(uploadsDir)) {
@@ -56,32 +52,17 @@ const normalizeBody = (req, _res, next) => {
 };
 
 router
-  .route('/')
+  .route('/generate')
   .get(assignTaskController.list)
   .post(
-    upload.single('image'), // handles multipart/form-data
+    upload.single('image'),
     normalizeBody,
     validateBody(assignTaskSchema),
-    assignTaskController.create
+    assignTaskController.generateFromWorkingDays
   );
 
-router.post(
-  '/bulk',
-  upload.single('image'),
-  normalizeBody,
-  validateBody(assignTaskListSchema),
-  assignTaskController.bulkCreate
-);
-
-router.post(
-  '/generate',
-  upload.single('image'),
-  normalizeBody,
-  assignTaskController.generateFromWorkingDays
-);
-
 router
-  .route('/:id')
+  .route('/generate/:id')
   .get(assignTaskController.getById)
   .put(
     upload.single('image'),

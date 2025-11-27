@@ -60,19 +60,22 @@ Base path: `/api`
 ### Working Days
 - `GET /api/working-days` — rows from `working_day`.
 
-### Assign Tasks (CRUD + Bulk)
-- `GET /api/assigntask` — list all.
-- `GET /api/assigntask/:id` — fetch one.
-- `POST /api/assigntask` — create one (JSON or multipart with `image` file).
-- `PUT /api/assigntask/:id` — update one (partial fields allowed).
-- `DELETE /api/assigntask/:id` — delete one.
-- `POST /api/assigntask/bulk` — create many in one request (array body; multipart allowed with shared `image`).
+### Assign Tasks (all under `/api/assigntask/generate`)
+- `GET /api/assigntask/generate` — list all assignments.
+- `GET /api/assigntask/generate/:id` — fetch one assignment.
+- `POST /api/assigntask/generate` — create assignments on each working day starting from `task_start_date`.
+- `PUT /api/assigntask/generate/:id` — update one assignment (multipart supported).
+- `DELETE /api/assigntask/generate/:id` — delete one assignment.
 
-Required fields: `department`, `name`, `task_description`
+Body (JSON or multipart/form-data):
+- `task_start_date` (required) — ISO date string; first date to consider.
+- `frequency` (optional) — `daily` (default), `weekly`, `monthly`, or `yearly`.
+- Any base assignment fields you want copied to each created row (e.g., `department`, `name`, `task_description`, `given_by`, `remark`, `status`, `attachment`, `remainder`).
+- `image` (optional file) — form-data field; saved to `/uploads/<filename>` and applied to every generated record.
 
-Optional fields: `given_by`, `remark`, `status`, `image`, `attachment`, `frequency`, `task_start_date`, `submission_date`, `delay` (auto-computed when both dates provided), `remainder`
-
-Auto fields: `id`, `task_id`, `created_at`
+Notes:
+- Uses the existing `working_day` table to pick real working dates; returns 400 errors when dates are invalid or no working days exist on/after the start.
+- Response shape: `{ "count": <number>, "items": [ ...createdRecords ] }`
 
 Example request (JSON):
 ```json
@@ -82,29 +85,35 @@ Example request (JSON):
   "task_description": "Clean lobby",
   "frequency": "daily",
   "task_start_date": "2025-12-27T18:30:00.000Z",
-  "submission_date": "2026-01-02T18:30:00.000Z"
+  "given_by": "Supervisor",
+  "remark": "Prioritize morning"
 }
 ```
 
 Example success response:
 ```json
 {
-  "id": 1,
-  "task_id": "1",
-  "department": "Maintenance",
-  "given_by": null,
-  "name": "John Doe",
-  "task_description": "Clean lobby",
-  "remark": null,
-  "status": null,
-  "image": null,
-  "attachment": null,
-  "frequency": "daily",
-  "task_start_date": "2025-12-27T18:30:00.000Z",
-  "submission_date": "2026-01-02T18:30:00.000Z",
-  "delay": 6,
-  "remainder": null,
-  "created_at": "2025-11-26T08:00:00.000Z"
+  "count": 3,
+  "items": [
+    {
+      "id": 1,
+      "task_id": "1",
+      "department": "Maintenance",
+      "given_by": "Supervisor",
+      "name": "John Doe",
+      "task_description": "Clean lobby",
+      "remark": "Prioritize morning",
+      "status": null,
+      "image": "/uploads/1732694440000-123456789.png",
+      "attachment": null,
+      "frequency": "daily",
+      "task_start_date": "2025-12-27T00:00:00.000Z",
+      "submission_date": null,
+      "delay": null,
+      "remainder": null,
+      "created_at": "2025-11-26T08:00:00.000Z"
+    }
+  ]
 }
 ```
 
@@ -123,9 +132,9 @@ Tests hit the Express app in-memory and do not require a database.
 
 ## Postman tips
 - For JSON: set `Content-Type: application/json`.
-- For file upload: use `form-data`, field `image` (file), other text fields as needed.
-- CRUD: add/update/delete/get on `/api/assigntask`; bulk insert at `/api/assigntask/bulk`; working days at `/api/working-days`.
-- Delay is auto-calculated when both `task_start_date` and `submission_date` are provided (difference in days, never negative).
+- For generation with a file: use `form-data`, field `image` (file), plus text fields (e.g., `task_start_date`, `frequency`, `department`, `task_description`).
+- List: `GET /api/assigntask/generate`; detail: `GET /api/assigntask/generate/:id`; update: `PUT /api/assigntask/generate/:id`; delete: `DELETE /api/assigntask/generate/:id`.
+- To seed working days, use your database and query them via `GET /api/working-days` to confirm before calling `/api/assigntask/generate`.
 
 ## Notes
 - PostgreSQL connection is configured in `config/db.js`; it is skipped in tests and uses SSL when `PG_SSL=true`.
