@@ -3,7 +3,7 @@ const { config } = require('../utils/config');
 
 class WorkingDayRepository {
   async findAll() {
-    if (config.env === 'test' || !config.pg.host) {
+    if (config.env === 'test') {
       return [];
     }
     const result = await query(

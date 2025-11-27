@@ -32,7 +32,7 @@ class AssignTaskRepository {
   }
 
   async findAll() {
-    if (useMemory || !config.pg.host) return this.records;
+    if (useMemory) return this.records;
     const result = await query(
       'SELECT * FROM assign_task ORDER BY id ASC'
     );
@@ -40,7 +40,7 @@ class AssignTaskRepository {
   }
 
   async findById(id) {
-    if (useMemory || !config.pg.host) {
+    if (useMemory) {
       return this.records.find((r) => String(r.id) === String(id));
     }
     const result = await query('SELECT * FROM assign_task WHERE id = $1', [id]);
@@ -48,7 +48,7 @@ class AssignTaskRepository {
   }
 
   async create(input) {
-    if (useMemory || !config.pg.host) {
+    if (useMemory) {
       return this.createInMemory(input);
     }
     const now = new Date().toISOString();
@@ -100,7 +100,7 @@ class AssignTaskRepository {
   }
 
   async update(id, input) {
-    if (useMemory || !config.pg.host) {
+    if (useMemory) {
       return this.updateInMemory(id, input);
     }
 
@@ -173,7 +173,7 @@ class AssignTaskRepository {
   }
 
   async delete(id) {
-    if (useMemory || !config.pg.host) {
+    if (useMemory) {
       return this.deleteInMemory(id);
     }
     const result = await query('DELETE FROM assign_task WHERE id = $1', [id]);

@@ -64,7 +64,7 @@ router
 router
   .route('/generate/:id')
   .get(assignTaskController.getById)
-  .put(
+  .patch(
     upload.single('image'),
     normalizeBody,
     validateBody(updateAssignTaskSchema),

@@ -64,11 +64,11 @@ Base path: `/api`
 - `GET /api/assigntask/generate` — list all assignments.
 - `GET /api/assigntask/generate/:id` — fetch one assignment.
 - `POST /api/assigntask/generate` — create assignments on each working day starting from `task_start_date`.
-- `PUT /api/assigntask/generate/:id` — update one assignment (multipart supported).
+- `PATCH /api/assigntask/generate/:id` — update one assignment (multipart supported).
 - `DELETE /api/assigntask/generate/:id` — delete one assignment.
 
 Body (JSON or multipart/form-data):
-- `task_start_date` (required) — ISO date string; first date to consider.
+- `task_start_date` (required) — ISO date-time string (e.g., `2025-12-27T18:30:00.000Z`); first date to consider.
 - `frequency` (optional) — `daily` (default), `weekly`, `monthly`, or `yearly`.
 - Any base assignment fields you want copied to each created row (e.g., `department`, `name`, `task_description`, `given_by`, `remark`, `status`, `attachment`, `remainder`).
 - `image` (optional file) — form-data field; saved to `/uploads/<filename>` and applied to every generated record.
@@ -76,6 +76,7 @@ Body (JSON or multipart/form-data):
 Notes:
 - Uses the existing `working_day` table to pick real working dates; returns 400 errors when dates are invalid or no working days exist on/after the start.
 - Response shape: `{ "count": <number>, "items": [ ...createdRecords ] }`
+- Updates automatically stamp `submission_date` to "now" when not provided and recompute `delay` based on `task_start_date` vs `submission_date`. If you pass `submission_date` in PATCH, use an ISO date-time string.
 
 Example request (JSON):
 ```json
@@ -133,7 +134,7 @@ Tests hit the Express app in-memory and do not require a database.
 ## Postman tips
 - For JSON: set `Content-Type: application/json`.
 - For generation with a file: use `form-data`, field `image` (file), plus text fields (e.g., `task_start_date`, `frequency`, `department`, `task_description`).
-- List: `GET /api/assigntask/generate`; detail: `GET /api/assigntask/generate/:id`; update: `PUT /api/assigntask/generate/:id`; delete: `DELETE /api/assigntask/generate/:id`.
+- List: `GET /api/assigntask/generate`; detail: `GET /api/assigntask/generate/:id`; update: `PATCH /api/assigntask/generate/:id`; delete: `DELETE /api/assigntask/generate/:id`.
 - To seed working days, use your database and query them via `GET /api/working-days` to confirm before calling `/api/assigntask/generate`.
 
 ## Notes
