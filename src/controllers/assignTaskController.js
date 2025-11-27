@@ -70,6 +70,15 @@ const assignTaskController = {
     } catch (err) {
       next(err);
     }
+  },
+
+  async stats(_req, res, next) {
+    try {
+      const snapshot = await assignTaskService.stats();
+      res.json(snapshot);
+    } catch (err) {
+      next(err);
+    }
   }
 };
 

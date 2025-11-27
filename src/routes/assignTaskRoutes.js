@@ -73,6 +73,8 @@ router
     assignTaskController.generateFromWorkingDays
   );
 
+router.get('/generate/stats', assignTaskController.stats);
+
 router
   .route('/generate/:id')
   .get(assignTaskController.getById)

@@ -14,7 +14,7 @@ const authController = {
         user: {
           id: user.id,
           user_name: user.user_name,
-          name: user.name || null
+          role: user.role || null
         }
       });
     } catch (err) {

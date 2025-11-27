@@ -141,6 +141,61 @@ class AssignTaskService {
   remove(id) {
     return assignTaskRepository.delete(id);
   }
+
+  async stats() {
+    const items = await this.list();
+    const total = items.length;
+    const now = new Date();
+
+    const normalizeStatus = (s) => (s ? String(s).trim().toLowerCase() : '');
+    const completedStatuses = new Set(['completed', 'done', 'yes', 'closed', 'resolved']);
+    const pendingStatuses = new Set(['pending', 'in-progress', 'in progress', 'open']);
+    const notDoneStatuses = new Set(['not done', 'notdone', 'no']);
+
+    let completed = 0;
+    let pending = 0;
+    let notDone = 0;
+    let overdue = 0;
+
+    items.forEach((task) => {
+      const status = normalizeStatus(task.status);
+
+      if (completedStatuses.has(status)) {
+        completed += 1;
+      } else if (pendingStatuses.has(status)) {
+        pending += 1;
+      } else if (notDoneStatuses.has(status)) {
+        notDone += 1;
+      }
+
+      const delayVal = Number(task.delay);
+      const hasDelay = !Number.isNaN(delayVal) && delayVal > 0;
+
+      let startPastNow = false;
+      if (task.task_start_date) {
+        const ts = new Date(task.task_start_date);
+        startPastNow = !Number.isNaN(ts.getTime()) && ts < now;
+      }
+
+      const missingSubmission = !task.submission_date;
+
+      if (hasDelay || (missingSubmission && startPastNow)) {
+        overdue += 1;
+      }
+    });
+
+    const progress =
+      total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    return {
+      total,
+      completed,
+      pending,
+      not_done: notDone,
+      overdue,
+      progress_percent: progress
+    };
+  }
 }
 
 const assignTaskService = new AssignTaskService();

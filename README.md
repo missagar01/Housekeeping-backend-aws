@@ -70,6 +70,10 @@ Base path: `/api`
 - `POST /api/assigntask/generate` — create assignments on each working day starting from `task_start_date`.
 - `PATCH /api/assigntask/generate/:id` — update one assignment (multipart supported).
 - `DELETE /api/assigntask/generate/:id` — delete one assignment.
+- `GET /api/assigntask/generate/stats` — dashboard snapshot (total, completed, pending, not done, overdue, progress%).
+
+### Dashboard
+- `GET /api/dashboard/summary` — same dashboard snapshot, exposed as a dedicated route for frontend dashboards.
 
 Body (JSON or multipart/form-data):
 - `task_start_date` (required) — ISO date-time string (e.g., `2025-12-27T18:30:00.000Z`); first date to consider.
@@ -153,6 +157,8 @@ Tests hit the Express app in-memory and do not require a database.
 - For JSON: set `Content-Type: application/json`.
 - For generation with a file: use `form-data`, field `image` (file), plus text fields (e.g., `task_start_date`, `frequency`, `department`, `task_description`).
 - List: `GET /api/assigntask/generate`; detail: `GET /api/assigntask/generate/:id`; update: `PATCH /api/assigntask/generate/:id`; delete: `DELETE /api/assigntask/generate/:id`.
+- Dashboard: `GET /api/assigntask/generate/stats`.
+- Dedicated dashboard route: `GET /api/dashboard/summary`.
 - To seed working days, use your database and query them via `GET /api/working-days` to confirm before calling `/api/assigntask/generate`.
 
 ## Notes
