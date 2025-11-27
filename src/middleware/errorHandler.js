@@ -14,6 +14,14 @@ const notFoundHandler = (req, res) => {
 
 // Centralized error handler
 const errorHandler = (err, req, res, _next) => {
+  // Handle common Postgres duplicate key constraint
+  if (err && err.code === '23505') {
+    const message = err.detail || err.message || 'Duplicate key value violates unique constraint';
+    const status = 409;
+    logger.error({ err, path: req.path }, 'Request failed');
+    return res.status(status).json({ message });
+  }
+
   const status = err instanceof ApiError ? err.statusCode : 500;
   const body = {
     message: err.message || 'Internal server error',
