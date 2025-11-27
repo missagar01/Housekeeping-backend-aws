@@ -1,5 +1,7 @@
 const { assignTaskService } = require('../services/assignTaskService');
 const { ApiError } = require('../middleware/errorHandler');
+const { notifyAssignmentUpdate } = require('../services/whatsappService');
+const { logger } = require('../utils/logger');
 
 const assignTaskController = {
   async create(req, res, next) {
@@ -52,6 +54,8 @@ const assignTaskController = {
     try {
       const updated = await assignTaskService.update(req.params.id, req.body);
       if (!updated) throw new ApiError(404, 'Assignment not found');
+      // Fire-and-forget notification; internal errors are logged inside the notifier.
+      notifyAssignmentUpdate(updated);
       res.json(updated);
     } catch (err) {
       next(err);

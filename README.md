@@ -19,6 +19,10 @@ PG_PASSWORD=sagarpipe
 PG_DATABASE=Housekeeping
 PG_SSL=true
 JWT_SECRET=choose-a-long-random-string
+MAYTAPI_PRODUCT_ID=your-product-id
+MAYTAPI_PHONE_ID=your-phone-id
+MAYTAPI_TOKEN=your-maytapi-token
+MAYTAPI_GROUP_ID=whatsapp-group-id
 ```
 
 `NODE_ENV=test` is set automatically for Jest to keep tests in-memory.
@@ -124,6 +128,20 @@ Validation errors return HTTP 400 with details.
 - Form-data field: `image` (file, max 5MB)
 - Returns: `{ "url": "/uploads/<filename>" }`
 - Use the returned `url` in frontend to display the uploaded image.
+
+### Auth
+- `POST /api/auth/login` — checks `users` table by `user_name` and `password`.
+
+Body:
+```json
+{
+  "user_name": "your-username",
+  "password": "your-password"
+}
+```
+
+On success: `{ "message": "Login successful", "user": { "id", "user_name", "name" } }`  
+On failure: HTTP 401.
 
 ## Testing (Jest + Supertest)
 ```

@@ -40,6 +40,16 @@ const normalizeItem = (item, file) => {
   if (file) {
     item.image = `/uploads/${file.filename}`;
   }
+
+  // Fix common key typos from clients
+  if (item && item.sttaus !== undefined && item.status === undefined) {
+    item.status = item.sttaus;
+    delete item.sttaus;
+  }
+  if (item && item['remark:'] !== undefined && item.remark === undefined) {
+    item.remark = item['remark:'];
+    delete item['remark:'];
+  }
 };
 
 const normalizeBody = (req, _res, next) => {
