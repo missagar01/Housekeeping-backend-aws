@@ -245,11 +245,9 @@ class AssignTaskService {
           startDay.setHours(0, 0, 0, 0);
           const today = new Date(now);
           today.setHours(0, 0, 0, 0);
-
-          if (startDay.getTime() === today.getTime()) {
-            pending += 1; // today, no submission
-          } else if (startDay.getTime() < today.getTime()) {
-            overdue += 1; // past start date, no submission
+          // Overdue: all missing submissions with start date on or before today
+          if (startDay.getTime() <= today.getTime()) {
+            overdue += 1;
           }
         }
       }
