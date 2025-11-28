@@ -1,9 +1,16 @@
 const { assignTaskRepository } = require('../repositories/assignTaskRepository');
 const { workingDayRepository } = require('../repositories/workingDayRepository');
 
+const ALLOWED_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
+const normalizeFrequency = (value) => {
+  const lower = typeof value === 'string' ? value.toLowerCase() : '';
+  return ALLOWED_FREQUENCIES.includes(lower) ? lower : 'daily';
+};
+
 class AssignTaskService {
   create(input) {
-    return assignTaskRepository.create(input);
+    const frequency = normalizeFrequency(input.frequency);
+    return assignTaskRepository.create({ ...input, frequency });
   }
 
   list() {
@@ -19,7 +26,8 @@ class AssignTaskService {
     for (const item of items) {
       // sequential to keep ids/tasks ordered
       // eslint-disable-next-line no-await-in-loop
-      const created = await assignTaskRepository.create(item);
+      const frequency = normalizeFrequency(item.frequency);
+      const created = await assignTaskRepository.create({ ...item, frequency });
       results.push(created);
     }
     return results;
@@ -110,23 +118,26 @@ class AssignTaskService {
     // Always include the first working day on/after start
     pickDates.push(workingDates[currentIndex]);
 
-    // Generate until we exceed the last working day
-    while (true) {
-      const candidate = increment(pickDates[pickDates.length - 1]);
-      if (candidate > lastWorkingDate) break;
+    if (freq !== 'one-time') {
+      // Generate until we exceed the last working day
+      while (true) {
+        const candidate = increment(pickDates[pickDates.length - 1]);
+        if (candidate > lastWorkingDate) break;
 
-      // find next working day >= candidate
-      const nextIdx = workingDates.findIndex(
-        (d, idx) => idx > currentIndex && d >= candidate
-      );
-      if (nextIdx === -1) break;
+        // find next working day >= candidate
+        const nextIdx = workingDates.findIndex(
+          (d, idx) => idx > currentIndex && d >= candidate
+        );
+        if (nextIdx === -1) break;
 
-      pickDates.push(workingDates[nextIdx]);
-      currentIndex = nextIdx;
+        pickDates.push(workingDates[nextIdx]);
+        currentIndex = nextIdx;
+      }
     }
 
     const tasks = pickDates.map((d) => ({
       ...base,
+      frequency: freq,
       task_start_date: d.toISOString(),
       submission_date: null
     }));
@@ -135,7 +146,11 @@ class AssignTaskService {
   }
 
   update(id, input) {
-    return assignTaskRepository.update(id, input);
+    const payload = { ...input };
+    if (Object.prototype.hasOwnProperty.call(input, 'frequency')) {
+      payload.frequency = normalizeFrequency(input.frequency);
+    }
+    return assignTaskRepository.update(id, payload);
   }
 
   remove(id) {

@@ -3,6 +3,12 @@ const { config } = require('../utils/config');
 
 const useMemory = config.env === 'test';
 
+const ALLOWED_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
+const normalizeFrequency = (value) => {
+  const lower = typeof value === 'string' ? value.toLowerCase() : '';
+  return ALLOWED_FREQUENCIES.includes(lower) ? lower : 'daily';
+};
+
 const computeDelay = (start, submission) => {
   if (!start || !submission) return null;
   const startDate = new Date(start);
@@ -60,6 +66,7 @@ class AssignTaskRepository {
     const id = seqResult.rows[0].id;
     const taskId = String(id);
     const computedDelay = computeDelay(input.task_start_date, submissionDate);
+    const frequency = normalizeFrequency(input.frequency);
 
     const sql = `
       INSERT INTO assign_task (
@@ -87,7 +94,7 @@ class AssignTaskRepository {
       input.status || null,
       input.image || null,
       input.attachment || null,
-      input.frequency || null,
+      frequency,
       input.task_start_date || null,
       submissionDate,
       input.delay ?? computedDelay,
@@ -135,6 +142,9 @@ class AssignTaskRepository {
     fields.forEach((field, idx) => {
       if (Object.prototype.hasOwnProperty.call(input, field)) {
         let value = input[field];
+        if (field === 'frequency') {
+          value = normalizeFrequency(value);
+        }
         if (field === 'delay' && computedDelay !== null) {
           value = computedDelay;
         }
@@ -185,6 +195,7 @@ class AssignTaskRepository {
     const id = this.nextId++;
     const submissionDate = input.submission_date ?? null;
     const computedDelay = computeDelay(input.task_start_date, submissionDate);
+    const frequency = normalizeFrequency(input.frequency);
     const record = {
       id,
       task_id: String(id),
@@ -196,7 +207,7 @@ class AssignTaskRepository {
       status: input.status || null,
       image: input.image || null,
       attachment: input.attachment || null,
-      frequency: input.frequency || null,
+      frequency,
       task_start_date: input.task_start_date || null,
       submission_date: submissionDate,
       delay: input.delay ?? computedDelay,
@@ -211,6 +222,9 @@ class AssignTaskRepository {
     const idx = this.records.findIndex((r) => String(r.id) === String(id));
     if (idx === -1) return null;
     const base = { ...this.records[idx], ...input };
+    if (Object.prototype.hasOwnProperty.call(input, 'frequency')) {
+      base.frequency = normalizeFrequency(input.frequency);
+    }
     if (input.submission_date === undefined) {
       base.submission_date = new Date().toISOString();
     }

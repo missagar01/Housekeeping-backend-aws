@@ -3,10 +3,41 @@ const { ApiError } = require('../middleware/errorHandler');
 const { notifyAssignmentUpdate } = require('../services/whatsappService');
 const { logger } = require('../utils/logger');
 
+const ALLOWED_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
+
+const normalizeFrequency = (value, { defaultValue } = {}) => {
+  if (value === undefined || value === null || value === '') {
+    return defaultValue;
+  }
+  const lower = String(value).toLowerCase();
+  if (ALLOWED_FREQUENCIES.includes(lower)) return lower;
+  return defaultValue !== undefined ? defaultValue : lower;
+};
+
+const prepareCreatePayload = (payload = {}) => {
+  const frequency = normalizeFrequency(payload.frequency, { defaultValue: 'daily' });
+  if (frequency === 'one-time' && !payload.task_start_date) {
+    throw new ApiError(400, 'task_start_date is required for one-time frequency');
+  }
+  return { ...payload, frequency };
+};
+
+const prepareUpdatePayload = (payload = {}) => {
+  if (Object.prototype.hasOwnProperty.call(payload, 'frequency')) {
+    const frequency = normalizeFrequency(payload.frequency, { defaultValue: 'daily' });
+    if (frequency === 'one-time' && !payload.task_start_date) {
+      throw new ApiError(400, 'task_start_date is required when setting frequency to one-time');
+    }
+    return { ...payload, frequency };
+  }
+  return payload;
+};
+
 const assignTaskController = {
   async create(req, res, next) {
     try {
-      const created = await assignTaskService.create(req.body);
+      const prepared = prepareCreatePayload(req.body);
+      const created = await assignTaskService.create(prepared);
       res.status(201).json(created);
     } catch (err) {
       next(err);
@@ -15,7 +46,9 @@ const assignTaskController = {
 
   async bulkCreate(req, res, next) {
     try {
-      const created = await assignTaskService.bulkCreate(req.body);
+      const body = Array.isArray(req.body) ? req.body : [];
+      const prepared = body.map((item) => prepareCreatePayload(item));
+      const created = await assignTaskService.bulkCreate(prepared);
       res.status(201).json({ count: created.length, items: created });
     } catch (err) {
       next(err);
@@ -52,7 +85,8 @@ const assignTaskController = {
 
   async update(req, res, next) {
     try {
-      const updated = await assignTaskService.update(req.params.id, req.body);
+      const prepared = prepareUpdatePayload(req.body);
+      const updated = await assignTaskService.update(req.params.id, prepared);
       if (!updated) throw new ApiError(404, 'Assignment not found');
       // Fire-and-forget notification; internal errors are logged inside the notifier.
       notifyAssignmentUpdate(updated);
