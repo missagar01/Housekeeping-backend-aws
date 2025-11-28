@@ -74,6 +74,7 @@ router
   );
 
 router.get('/generate/stats', assignTaskController.stats);
+router.get('/generate/overdue', assignTaskController.overdue);
 
 router
   .route('/generate/:id')

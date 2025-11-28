@@ -264,6 +264,21 @@ class AssignTaskService {
       progress_percent: progress
     };
   }
+
+  // Return all tasks with start date on/before today and no submission
+  async overdue() {
+    const items = await this.list();
+    const endOfToday = new Date();
+    endOfToday.setHours(23, 59, 59, 999);
+
+    return items.filter((task) => {
+      if (!task || !task.task_start_date) return false;
+      const start = new Date(task.task_start_date);
+      if (Number.isNaN(start.getTime())) return false;
+      if (start > endOfToday) return false;
+      return !task.submission_date;
+    });
+  }
 }
 
 const assignTaskService = new AssignTaskService();

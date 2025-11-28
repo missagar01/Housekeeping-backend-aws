@@ -113,6 +113,15 @@ const assignTaskController = {
     } catch (err) {
       next(err);
     }
+  },
+
+  async overdue(_req, res, next) {
+    try {
+      const items = await assignTaskService.overdue();
+      res.json(items);
+    } catch (err) {
+      next(err);
+    }
   }
 };
 
