@@ -19,7 +19,3 @@ process.on('uncaughtException', (err) => {
   logger.error({ err }, 'Uncaught exception');
   process.exit(1);
 });
-
-
-
-

@@ -25,6 +25,27 @@ app.use('/api/uploads', express.static(uploadsDir));
 
 app.use('/api', routes);
 
+// Health/status routes at the root for quick checks
+app.get('/', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'housekeeping-backend',
+    environment: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 3005,
+    timestamp: new Date().toISOString()
+  });
+});
+
+app.get('/health', (_req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    service: 'housekeeping-backend',
+    environment: process.env.NODE_ENV || 'development',
+    port: process.env.PORT || 3005,
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.use(notFoundHandler);
 app.use(errorHandler);
 
