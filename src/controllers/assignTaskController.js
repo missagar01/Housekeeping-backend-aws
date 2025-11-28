@@ -122,6 +122,15 @@ const assignTaskController = {
     } catch (err) {
       next(err);
     }
+  },
+
+  async notDone(_req, res, next) {
+    try {
+      const items = await assignTaskService.notDone();
+      res.json(items);
+    } catch (err) {
+      next(err);
+    }
   }
 };
 

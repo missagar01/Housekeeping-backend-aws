@@ -279,6 +279,15 @@ class AssignTaskService {
       return !task.submission_date;
     });
   }
+
+  // Return all tasks explicitly marked as not done (status "no")
+  async notDone() {
+    const items = await this.list();
+    return items.filter((task) => {
+      const status = task && task.status ? String(task.status).trim().toLowerCase() : '';
+      return status === 'no';
+    });
+  }
 }
 
 const assignTaskService = new AssignTaskService();

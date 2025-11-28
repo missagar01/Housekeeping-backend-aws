@@ -71,10 +71,11 @@ router
     normalizeBody,
     validateBody(assignTaskSchema),
     assignTaskController.generateFromWorkingDays
-  );
+);
 
 router.get('/generate/stats', assignTaskController.stats);
 router.get('/generate/overdue', assignTaskController.overdue);
+router.get('/generate/not-done', assignTaskController.notDone);
 
 router
   .route('/generate/:id')
