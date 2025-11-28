@@ -2,7 +2,7 @@ name: "🚀 Node.js CI & Deploy to EC2"
 
 on:
   push:
-    branches: [ "master" ]   # yahi branch pe deploy chahiye
+    branches: ["master"] # deploy only from master
   workflow_dispatch:
 
 jobs:
@@ -16,7 +16,7 @@ jobs:
       RUNNER_TEMP: /home/ubuntu/actions-runner/_temp
       RUNNER_TOOL_CACHE: /home/ubuntu/actions-runner/_tool
       DEPLOY_DIR: /home/ubuntu/BatchCode-backend-aws
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 3005
       LOG_LEVEL: info
       PG_HOST: ${{ secrets.PG_HOST }}
@@ -32,11 +32,7 @@ jobs:
       DB_NAME: ${{ secrets.DB_NAME }}
       DB_SSL: true
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      JWT_EXPIRES_IN: 1d
-      AWS_REGION: ap-south-1
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_BUCKET_NAME: ${{ secrets.AWS_BUCKET_NAME }}
+      JWT_EXPIRES_IN: 30d
 
     steps:
       - name: "📥 Checkout code"
@@ -52,43 +48,35 @@ jobs:
           node-version: 20
           cache: npm
 
-      # Workspace (temp) me dependencies install kar lena (tests wagaira ke liye)
       - name: "📦 Install dependencies (workspace)"
         run: npm ci
 
-      # Agar build script hai to hi build kare
       - name: "🧪 Build (if script exists)"
         run: |
-          if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts.build ? 0 : 1)"; then
+          if node -e "const p=require('./package.json'); process.exit(p?.scripts?.build ? 0 : 1)"; then
             echo "✅ Build script मिला, npm run build चला रहे हैं…"
             npm run build
           else
             echo "ℹ️ Build script नहीं मिला, build step skip कर रहे हैं।"
           fi
 
-      # 🚚 Actual deployment: code ko /home/ubuntu/BatchCode-backend-aws me sync karo
       - name: "📂 Sync code to deploy directory"
         run: |
           echo "Syncing code to $DEPLOY_DIR ..."
           mkdir -p "$DEPLOY_DIR"
-          rsync -av --delete ./ "$DEPLOY_DIR"/
+          rsync -av --delete --exclude '.git' --exclude 'node_modules' ./ "$DEPLOY_DIR"/
 
-      # 🔁 Deploy with PM2 from DEPLOY_DIR
       - name: "🚀 Deploy with PM2 (src/server.js)"
         shell: bash
         run: |
           set -e
 
-          # PM2 installed है या नहीं, check करें
           if ! command -v pm2 >/dev/null 2>&1; then
             echo "PM2 नहीं मिला, install कर रहे हैं…"
             sudo npm i -g pm2
           fi
 
           APP_NAME="batchcode-backend"
-
-          echo "Using APP_NAME=$APP_NAME"
-          echo "Using DEPLOY_DIR=$DEPLOY_DIR"
 
           cd "$DEPLOY_DIR"
 
@@ -114,17 +102,10 @@ jobs:
 
           JWT_SECRET=${JWT_SECRET}
           JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
-
-          AWS_REGION=${AWS_REGION}
-          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-          AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-          AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
           EOF
 
-          # Deploy dir me dependencies install/update करो
           npm ci
 
-          # अगर पहले से process है तो reload करो, नहीं है तो नया start करो
           if pm2 describe "${APP_NAME}" >/dev/null 2>&1; then
             echo "🌀 Existing PM2 process मिला, reload कर रहे हैं…"
             pm2 reload "${APP_NAME}" --update-env
@@ -133,7 +114,6 @@ jobs:
             pm2 start "$DEPLOY_DIR/src/server.js" --name "${APP_NAME}"
           fi
 
-          # Process list save (reboot के बाद के लिए)
           pm2 save || true
 
           echo "✅ PM2 status:"
