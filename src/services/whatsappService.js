@@ -11,6 +11,11 @@ const {
 const missingConfig = () =>
   !MAYTAPI_PRODUCT_ID || !MAYTAPI_PHONE_ID || !MAYTAPI_TOKEN || !MAYTAPI_GROUP_ID;
 
+const formatLocalDateTime = (d = new Date()) => {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
 const sendRequest = (body) =>
   new Promise((resolve, reject) => {
     const payload = JSON.stringify(body);
@@ -61,10 +66,11 @@ const notifyAssignmentUpdate = async (task) => {
   const message = [
     'Task Updated',
     `ID: ${task.id || '-'}`,
+    `Department: ${task.department || '-'}`,
     `Description: ${task.task_description || '-'}`,
     `Status: ${task.status || '-'}`,
     `Remark: ${task.remark || '-'}`,
-    `Date: ${new Date().toISOString()}`
+    `Date: ${formatLocalDateTime()}`
   ].join('\n');
 
   try {
