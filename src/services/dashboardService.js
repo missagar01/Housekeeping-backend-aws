@@ -13,7 +13,7 @@ class DashboardService {
   async summary() {
     const items = await assignTaskService.list();
     const active = items.filter((task) => isOnOrBeforeToday(task.task_start_date));
-    return assignTaskService.stats(active);
+    return assignTaskService.stats(items, active);
   }
 }
 
