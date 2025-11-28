@@ -157,8 +157,8 @@ class AssignTaskService {
     return assignTaskRepository.delete(id);
   }
 
-  async stats() {
-    const items = await this.list();
+  async stats(itemsOverride) {
+    const items = itemsOverride || await this.list();
     const total = items.length;
     const now = new Date();
 
