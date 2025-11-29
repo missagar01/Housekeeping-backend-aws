@@ -39,6 +39,7 @@ CREATE TABLE IF NOT EXISTS assign_task (
     status VARCHAR(50),
     image TEXT,
     attachment TEXT,
+    hod VARCHAR(255),
     frequency VARCHAR(50),
     task_start_date DATE,
     submission_date DATE,
@@ -92,7 +93,7 @@ npm start     # node src/server.js
 
 **POST / PATCH body (JSON or multipart/form-data):**
 - Required for POST: `task_start_date` (ISO datetime).
-- Optional: `frequency` (`daily` default, `weekly`, `monthly`, `yearly`), `department`, `name`, `task_description`, `given_by`, `remark`, `status`, `attachment`, `remainder`, `image` file.
+- Optional: `frequency` (`daily` default, `weekly`, `monthly`, `yearly`), `department`, `name`, `task_description`, `given_by`, `remark`, `status`, `attachment`, `hod`, `remainder`, `image` file.
 - On PATCH, `submission_date` is preserved unless explicitly provided; `delay` recomputes when date fields change.
 
 ### Dashboard

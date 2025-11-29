@@ -31,6 +31,14 @@ const applyComputedDelay = (record) => {
   return record;
 };
 
+const serializeHod = (value) => {
+  if (value === undefined || value === null) return null;
+  if (Array.isArray(value)) {
+    return value.map((v) => (v === null || v === undefined ? '' : String(v))).join(',');
+  }
+  return String(value);
+};
+
 class AssignTaskRepository {
   constructor() {
     this.records = [];
@@ -67,19 +75,20 @@ class AssignTaskRepository {
     const taskId = String(id);
     const computedDelay = computeDelay(input.task_start_date, submissionDate);
     const frequency = normalizeFrequency(input.frequency);
+    const hod = serializeHod(input.hod);
 
     const sql = `
       INSERT INTO assign_task (
         id, task_id, department, given_by, name, task_description, remark, status,
-        image, attachment, frequency, task_start_date, submission_date,
+        image, attachment, hod, frequency, task_start_date, submission_date,
         delay, remainder, created_at
       )
       VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14, $15, $16
+        $9, $10, $11, $12, $13, $14, $15, $16, $17
       )
       RETURNING id, task_id, department, given_by, name, task_description, remark, status,
-        image, attachment, frequency, task_start_date, submission_date,
+        image, attachment, hod, frequency, task_start_date, submission_date,
         delay, remainder, created_at;
     `;
 
@@ -94,6 +103,7 @@ class AssignTaskRepository {
       input.status || null,
       input.image || null,
       input.attachment || null,
+      hod,
       frequency,
       input.task_start_date || null,
       submissionDate,
@@ -129,6 +139,7 @@ class AssignTaskRepository {
       'status',
       'image',
       'attachment',
+      'hod',
       'frequency',
       'task_start_date',
       'submission_date',
@@ -149,6 +160,9 @@ class AssignTaskRepository {
         }
         if (field === 'submission_date') {
           value = submissionDate;
+        }
+        if (field === 'hod') {
+          value = serializeHod(value);
         }
         setClauses.push(`${field} = $${params.length + 1}`);
         params.push(value);
@@ -205,6 +219,7 @@ class AssignTaskRepository {
       status: input.status || null,
       image: input.image || null,
       attachment: input.attachment || null,
+      hod: input.hod || null,
       frequency,
       task_start_date: input.task_start_date || null,
       submission_date: submissionDate,
@@ -226,6 +241,9 @@ class AssignTaskRepository {
     const computedDelay = computeDelay(base.task_start_date, base.submission_date);
     if (computedDelay !== null) {
       base.delay = computedDelay;
+    }
+    if (Object.prototype.hasOwnProperty.call(input, 'hod')) {
+      base.hod = serializeHod(input.hod);
     }
     this.records[idx] = base;
     return base;
