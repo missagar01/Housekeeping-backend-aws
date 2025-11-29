@@ -237,19 +237,21 @@ class AssignTaskService {
     // Pending / overdue from active tasks (e.g., on or before today)
     activeItems.forEach((task) => {
       const missingSubmission = !task.submission_date;
-      if (missingSubmission) {
-        const ts = task.task_start_date ? new Date(task.task_start_date) : null;
-        const hasValidStart = ts && !Number.isNaN(ts.getTime());
-        if (hasValidStart) {
-          const startDay = new Date(ts);
-          startDay.setHours(0, 0, 0, 0);
-          const today = new Date(now);
-          today.setHours(0, 0, 0, 0);
-          // Overdue: all missing submissions with start date on or before today
-          if (startDay.getTime() <= today.getTime()) {
-            overdue += 1;
-          }
-        }
+      if (!missingSubmission) return;
+
+      const ts = task.task_start_date ? new Date(task.task_start_date) : null;
+      const hasValidStart = ts && !Number.isNaN(ts.getTime());
+      const startDay = hasValidStart ? new Date(ts) : null;
+      if (startDay) {
+        startDay.setHours(0, 0, 0, 0);
+      }
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+
+      if (hasValidStart && startDay.getTime() <= today.getTime()) {
+        overdue += 1;
+      } else {
+        pending += 1;
       }
     });
 
