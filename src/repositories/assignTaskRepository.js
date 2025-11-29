@@ -114,10 +114,9 @@ class AssignTaskRepository {
     const existing = await this.findById(id);
     if (!existing) return null;
 
-    const submissionDate =
-      input.submission_date !== undefined
-        ? input.submission_date
-        : new Date().toISOString();
+    const submissionDate = Object.prototype.hasOwnProperty.call(input, 'submission_date')
+      ? input.submission_date
+      : existing.submission_date;
     const taskStartDate = input.task_start_date ?? existing.task_start_date;
     const computedDelay = computeDelay(taskStartDate, submissionDate);
 
@@ -139,7 +138,7 @@ class AssignTaskRepository {
 
     const setClauses = [];
     const params = [];
-    fields.forEach((field, idx) => {
+    fields.forEach((field) => {
       if (Object.prototype.hasOwnProperty.call(input, field)) {
         let value = input[field];
         if (field === 'frequency') {
@@ -148,19 +147,18 @@ class AssignTaskRepository {
         if (field === 'delay' && computedDelay !== null) {
           value = computedDelay;
         }
+        if (field === 'submission_date') {
+          value = submissionDate;
+        }
         setClauses.push(`${field} = $${params.length + 1}`);
         params.push(value);
       }
     });
 
-    // ensure submission_date is set to "now" when not provided
-    if (!Object.prototype.hasOwnProperty.call(input, 'submission_date')) {
-      setClauses.push(`submission_date = $${params.length + 1}`);
-      params.push(submissionDate);
-    }
-
     // ensure delay updates when dates change even if delay not explicitly provided
-    if (!Object.prototype.hasOwnProperty.call(input, 'delay') && computedDelay !== null) {
+    const datesChanged = Object.prototype.hasOwnProperty.call(input, 'submission_date') ||
+      Object.prototype.hasOwnProperty.call(input, 'task_start_date');
+    if (!Object.prototype.hasOwnProperty.call(input, 'delay') && computedDelay !== null && datesChanged) {
       setClauses.push(`${'delay'} = $${params.length + 1}`);
       params.push(computedDelay);
     }
@@ -224,9 +222,6 @@ class AssignTaskRepository {
     const base = { ...this.records[idx], ...input };
     if (Object.prototype.hasOwnProperty.call(input, 'frequency')) {
       base.frequency = normalizeFrequency(input.frequency);
-    }
-    if (input.submission_date === undefined) {
-      base.submission_date = new Date().toISOString();
     }
     const computedDelay = computeDelay(base.task_start_date, base.submission_date);
     if (computedDelay !== null) {

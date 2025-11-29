@@ -131,6 +131,20 @@ const assignTaskController = {
     } catch (err) {
       next(err);
     }
+  },
+
+  // Mark an assignment as confirmed (stores marker in attachment column)
+  async confirmAttachment(req, res, next) {
+    try {
+      const attachmentValue = req.body && req.body.attachment
+        ? String(req.body.attachment)
+        : 'confirmed';
+      const updated = await assignTaskService.update(req.params.id, { attachment: attachmentValue });
+      if (!updated) throw new ApiError(404, 'Assignment not found');
+      res.json(updated);
+    } catch (err) {
+      next(err);
+    }
   }
 };
 

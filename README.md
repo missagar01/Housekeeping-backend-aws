@@ -86,13 +86,14 @@ npm start     # node src/server.js
 - `GET /api/assigntask/generate/:id` — fetch one.
 - `POST /api/assigntask/generate` — generate tasks from working days (multipart or JSON).
 - `PATCH /api/assigntask/generate/:id` — update one (multipart supported).
+- `POST /api/assigntask/generate/:id/confirm` — mark a task as confirmed (writes `attachment = "confirmed"`).
 - `DELETE /api/assigntask/generate/:id` — delete one.
 - `GET /api/assigntask/generate/stats` — totals (total/completed/pending/not done/overdue/progress%).
 
 **POST / PATCH body (JSON or multipart/form-data):**
 - Required for POST: `task_start_date` (ISO datetime).
 - Optional: `frequency` (`daily` default, `weekly`, `monthly`, `yearly`), `department`, `name`, `task_description`, `given_by`, `remark`, `status`, `attachment`, `remainder`, `image` file.
-- On PATCH, `submission_date` auto-sets to now if omitted; `delay` recomputed from `task_start_date` vs `submission_date`.
+- On PATCH, `submission_date` is preserved unless explicitly provided; `delay` recomputes when date fields change.
 
 ### Dashboard
 - `GET /api/dashboard/summary` — same stats as above, dedicated for frontend dashboards.

@@ -123,7 +123,6 @@ class AssignTaskService {
       while (true) {
         const candidate = increment(pickDates[pickDates.length - 1]);
         if (candidate > lastWorkingDate) break;
-
         // find next working day >= candidate
         const nextIdx = workingDates.findIndex(
           (d, idx) => idx > currentIndex && d >= candidate
