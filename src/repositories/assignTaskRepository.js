@@ -89,6 +89,7 @@ class AssignTaskRepository {
       sql += ` OFFSET $${params.length}`;
     }
 
+    
     const result = await query(sql, params);
     return result.rows.map(applyComputedDelay);
   }
