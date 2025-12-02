@@ -15,7 +15,7 @@ jobs:
     env:
       RUNNER_TEMP: /home/ubuntu/actions-runner/_temp
       RUNNER_TOOL_CACHE: /home/ubuntu/actions-runner/_tool
-      DEPLOY_DIR: /home/ubuntu/BatchCode-backend-aws
+      DEPLOY_DIR: /home/ubuntu/housekeeping-backend
       NODE_ENV: production
       PORT: 3005
       LOG_LEVEL: info
@@ -76,7 +76,7 @@ jobs:
             sudo npm i -g pm2
           fi
 
-          APP_NAME="batchcode-backend"
+          APP_NAME="housekeeping-backend"
 
           cd "$DEPLOY_DIR"
 
