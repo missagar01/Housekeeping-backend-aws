@@ -164,6 +164,11 @@ class AssignTaskService {
     return assignTaskRepository.delete(id);
   }
 
+  async aggregateStats(cutoffOverride) {
+    const cutoff = cutoffOverride || getEndOfYesterday();
+    return assignTaskRepository.aggregateStats(cutoff);
+  }
+
   async stats(itemsOverride) {
     const items = itemsOverride || await this.list();
     const total = items.length;

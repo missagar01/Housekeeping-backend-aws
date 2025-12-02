@@ -125,6 +125,93 @@ class AssignTaskRepository {
     return result.rows.map(applyComputedDelay);
   }
 
+  async aggregateStats(cutoff) {
+    if (useMemory) {
+      const all = await this.findAll();
+      const cutoffDay = new Date(cutoff);
+      cutoffDay.setHours(0, 0, 0, 0);
+
+      const toLower = (v) => (v ? String(v).trim().toLowerCase() : '');
+      const completed = all.filter((t) => toLower(t.status) === 'yes').length;
+      const notDone = all.filter((t) => toLower(t.status) === 'no').length;
+
+      const active = all.filter((t) => {
+        if (!t.task_start_date) return true;
+        const d = new Date(t.task_start_date);
+        if (Number.isNaN(d.getTime())) return true;
+        d.setHours(0, 0, 0, 0);
+        return d.getTime() <= cutoffDay.getTime();
+      });
+
+      let overdue = 0;
+      let pending = 0;
+      active.forEach((t) => {
+        if (t.submission_date) return;
+        if (!t.task_start_date) {
+          pending += 1;
+          return;
+        }
+        const d = new Date(t.task_start_date);
+        if (Number.isNaN(d.getTime())) {
+          pending += 1;
+          return;
+        }
+        d.setHours(0, 0, 0, 0);
+        if (d.getTime() <= cutoffDay.getTime()) {
+          overdue += 1;
+        } else {
+          pending += 1;
+        }
+      });
+
+      const total = active.length;
+      const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      return {
+        total,
+        completed,
+        pending,
+        not_done: notDone,
+        overdue,
+        progress_percent: progress
+      };
+    }
+
+    const sql = `
+      WITH base AS (
+        SELECT
+          lower(trim(status)) AS status,
+          task_start_date,
+          submission_date
+        FROM assign_task
+      )
+      SELECT
+        (SELECT count(*) FROM base WHERE status = 'yes') AS completed,
+        (SELECT count(*) FROM base WHERE status = 'no') AS not_done,
+        (SELECT count(*) FROM base WHERE submission_date IS NULL AND task_start_date IS NOT NULL AND task_start_date::date <= $1::date) AS overdue,
+        (SELECT count(*) FROM base WHERE submission_date IS NULL AND task_start_date IS NULL) AS pending,
+        (SELECT count(*) FROM base WHERE task_start_date IS NULL OR task_start_date::date <= $1::date) AS total;
+    `;
+
+    const result = await query(sql, [cutoff]);
+    const row = result.rows[0] || {};
+    const total = Number(row.total) || 0;
+    const completed = Number(row.completed) || 0;
+    const pending = Number(row.pending) || 0;
+    const notDone = Number(row.not_done) || 0;
+    const overdue = Number(row.overdue) || 0;
+    const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    return {
+      total,
+      completed,
+      pending,
+      not_done: notDone,
+      overdue,
+      progress_percent: progress
+    };
+  }
+
   async findByDate(targetDate, options = {}) {
     if (useMemory) {
       const dayStart = new Date(targetDate);
