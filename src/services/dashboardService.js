@@ -15,6 +15,7 @@ class DashboardService {
   }
 }
 
+
 const dashboardService = new DashboardService();
 
 module.exports = { dashboardService };
