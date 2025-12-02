@@ -4,6 +4,12 @@ const { notifyAssignmentUpdate } = require('../services/whatsappService');
 const { logger } = require('../utils/logger');
 
 const ALLOWED_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly', 'one-time'];
+const parsePositiveInt = (value, { max, defaultValue } = {}) => {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n <= 0) return defaultValue;
+  const capped = max ? Math.min(n, max) : n;
+  return capped;
+};
 
 const normalizeFrequency = (value, { defaultValue } = {}) => {
   if (value === undefined || value === null || value === '') {
@@ -64,9 +70,14 @@ const assignTaskController = {
     }
   },
 
-  async list(_req, res, next) {
+  async list(req, res, next) {
     try {
-      const items = await assignTaskService.list();
+      const limit = parsePositiveInt(req.query?.limit, { max: 100, defaultValue: 100 });
+      const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
+      const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
+      const effectiveOffset = page && limit ? (page - 1) * limit : offset;
+
+      const items = await assignTaskService.list({ limit, offset: effectiveOffset });
       res.json(items);
     } catch (err) {
       next(err);
@@ -115,9 +126,14 @@ const assignTaskController = {
     }
   },
 
-  async overdue(_req, res, next) {
+  async overdue(req, res, next) {
     try {
-      const items = await assignTaskService.overdue();
+      const limit = parsePositiveInt(req.query?.limit, { max: 100, defaultValue: 100 });
+      const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
+      const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
+      const effectiveOffset = page && limit ? (page - 1) * limit : offset;
+
+      const items = await assignTaskService.overdue({ limit, offset: effectiveOffset });
       res.json(items);
     } catch (err) {
       next(err);
@@ -127,6 +143,20 @@ const assignTaskController = {
   async notDone(_req, res, next) {
     try {
       const items = await assignTaskService.notDone();
+      res.json(items);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async today(req, res, next) {
+    try {
+      const limit = parsePositiveInt(req.query?.limit, { max: 100, defaultValue: 100 });
+      const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
+      const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
+      const effectiveOffset = page && limit ? (page - 1) * limit : offset;
+
+      const items = await assignTaskService.today({ limit, offset: effectiveOffset });
       res.json(items);
     } catch (err) {
       next(err);

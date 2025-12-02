@@ -1,18 +1,25 @@
 const { assignTaskService } = require('./assignTaskService');
 
-const isOnOrBeforeToday = (dateStr) => {
+const isOnOrBeforeCutoff = (dateStr, cutoff) => {
   if (!dateStr) return true; // include tasks without a start date
   const d = new Date(dateStr);
   if (Number.isNaN(d.getTime())) return true; // include if invalid date stored
-  const today = new Date();
-  today.setHours(23, 59, 59, 999); // end of today
-  return d <= today;
+  return d <= cutoff;
+};
+
+const getEndOfYesterday = () => {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - 1);
+  cutoff.setHours(23, 59, 59, 999);
+  return cutoff;
 };
 
 class DashboardService {
   async summary() {
     const items = await assignTaskService.list();
-    const active = items.filter((task) => isOnOrBeforeToday(task.task_start_date));
+    const cutoff = getEndOfYesterday();
+    const active = items.filter((task) => isOnOrBeforeCutoff(task.task_start_date, cutoff));
     return assignTaskService.stats(items, active);
   }
 }

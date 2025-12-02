@@ -79,6 +79,8 @@ router.get('/generate/overdue', assignTaskController.overdue);
 
 router.get('/generate/not-done', assignTaskController.notDone);
 
+router.get('/generate/today', assignTaskController.today);
+
 // Mark an assignment as confirmed (stores marker in attachment column)
 router.post('/generate/:id/confirm', assignTaskController.confirmAttachment);
 

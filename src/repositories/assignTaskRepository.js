@@ -9,6 +9,7 @@ const normalizeFrequency = (value) => {
   return ALLOWED_FREQUENCIES.includes(lower) ? lower : 'daily';
 };
 
+
 const computeDelay = (start, submission) => {
   if (!start || !submission) return null;
   const startDate = new Date(start);
@@ -45,11 +46,31 @@ class AssignTaskRepository {
     this.nextId = 1;
   }
 
-  async findAll() {
-    if (useMemory) return this.records;
-    const result = await query(
-      'SELECT * FROM assign_task ORDER BY id ASC'
-    );
+  async findAll(options = {}) {
+    if (useMemory) {
+      const { limit, offset } = options;
+      const start = Number.isInteger(offset) && offset > 0 ? offset : 0;
+      const end = Number.isInteger(limit) && limit > 0 ? start + limit : undefined;
+      return this.records.slice(start, end);
+    }
+
+    const params = [];
+    let sql = 'SELECT * FROM assign_task ORDER BY id ASC';
+
+    const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
+    const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
+
+    if (hasLimit) {
+      params.push(options.limit);
+      sql += ` LIMIT $${params.length}`;
+    }
+    if (hasOffset) {
+      if (!hasLimit) sql += ' LIMIT ALL';
+      params.push(options.offset);
+      sql += ` OFFSET $${params.length}`;
+    }
+
+    const result = await query(sql, params);
     return result.rows.map(applyComputedDelay);
   }
 
@@ -59,6 +80,94 @@ class AssignTaskRepository {
     }
     const result = await query('SELECT * FROM assign_task WHERE id = $1', [id]);
     return applyComputedDelay(result.rows[0]);
+  }
+
+  async findOverdue(cutoff, options = {}) {
+    if (useMemory) {
+      const endTs = cutoff ? cutoff.getTime() : Number.POSITIVE_INFINITY;
+      const filtered = this.records.filter((task) => {
+        if (!task || !task.task_start_date) return false;
+        const start = new Date(task.task_start_date);
+        if (Number.isNaN(start.getTime())) return false;
+        if (start > endTs) return false;
+        return !task.submission_date;
+      });
+      const { limit, offset } = options;
+      const start = Number.isInteger(offset) && offset > 0 ? offset : 0;
+      const end = Number.isInteger(limit) && limit > 0 ? start + limit : undefined;
+      return filtered.slice(start, end);
+    }
+
+    const params = [cutoff];
+    let sql = `
+      SELECT *
+      FROM assign_task
+      WHERE submission_date IS NULL
+        AND task_start_date IS NOT NULL
+        AND task_start_date <= $1
+      ORDER BY task_start_date ASC
+    `;
+
+    const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
+    const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
+
+    if (hasLimit) {
+      params.push(options.limit);
+      sql += ` LIMIT $${params.length}`;
+    }
+    if (hasOffset) {
+      if (!hasLimit) sql += ' LIMIT ALL';
+      params.push(options.offset);
+      sql += ` OFFSET $${params.length}`;
+    }
+
+    const result = await query(sql, params);
+    return result.rows.map(applyComputedDelay);
+  }
+
+  async findByDate(targetDate, options = {}) {
+    if (useMemory) {
+      const dayStart = new Date(targetDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      const filtered = this.records.filter((task) => {
+        if (!task || !task.task_start_date) return false;
+        const start = new Date(task.task_start_date);
+        if (Number.isNaN(start.getTime())) return false;
+        return start >= dayStart && start < dayEnd;
+      });
+
+      const { limit, offset } = options;
+      const startIdx = Number.isInteger(offset) && offset > 0 ? offset : 0;
+      const endIdx = Number.isInteger(limit) && limit > 0 ? startIdx + limit : undefined;
+      return filtered.slice(startIdx, endIdx);
+    }
+
+    const params = [targetDate];
+    let sql = `
+      SELECT *
+      FROM assign_task
+      WHERE task_start_date::date = $1::date
+      ORDER BY id ASC
+    `;
+
+    const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
+    const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
+
+    if (hasLimit) {
+      params.push(options.limit);
+      sql += ` LIMIT $${params.length}`;
+    }
+    if (hasOffset) {
+      if (!hasLimit) sql += ' LIMIT ALL';
+      params.push(options.offset);
+      sql += ` OFFSET $${params.length}`;
+    }
+
+    const result = await query(sql, params);
+    return result.rows.map(applyComputedDelay);
   }
 
   async create(input) {

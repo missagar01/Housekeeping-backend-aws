@@ -7,14 +7,22 @@ const normalizeFrequency = (value) => {
   return ALLOWED_FREQUENCIES.includes(lower) ? lower : 'daily';
 };
 
+const getEndOfYesterday = () => {
+  const cutoff = new Date();
+  cutoff.setHours(0, 0, 0, 0);
+  cutoff.setDate(cutoff.getDate() - 1);
+  cutoff.setHours(23, 59, 59, 999);
+  return cutoff;
+};
+
 class AssignTaskService {
   create(input) {
     const frequency = normalizeFrequency(input.frequency);
     return assignTaskRepository.create({ ...input, frequency });
   }
 
-  list() {
-    return assignTaskRepository.findAll();
+  list(options = {}) {
+    return assignTaskRepository.findAll(options);
   }
 
   getById(id) {
@@ -217,6 +225,7 @@ class AssignTaskService {
     const now = new Date();
 
     const normalizeStatus = (s) => (s ? String(s).trim().toLowerCase() : '');
+    const cutoff = getEndOfYesterday();
 
     let completed = 0;
     let pending = 0;
@@ -233,7 +242,7 @@ class AssignTaskService {
       }
     });
 
-    // Pending / overdue from active tasks (e.g., on or before today)
+    // Pending / overdue from active tasks (on or before the cutoff day)
     activeItems.forEach((task) => {
       const missingSubmission = !task.submission_date;
       if (!missingSubmission) return;
@@ -244,10 +253,8 @@ class AssignTaskService {
       if (startDay) {
         startDay.setHours(0, 0, 0, 0);
       }
-      const today = new Date(now);
-      today.setHours(0, 0, 0, 0);
 
-      if (hasValidStart && startDay.getTime() <= today.getTime()) {
+      if (hasValidStart && startDay.getTime() <= cutoff.getTime()) {
         overdue += 1;
       } else {
         pending += 1;
@@ -266,19 +273,10 @@ class AssignTaskService {
     };
   }
 
-  // Return all tasks with start date on/before today and no submission
-  async overdue() {
-    const items = await this.list();
-    const endOfToday = new Date();
-    endOfToday.setHours(23, 59, 59, 999);
-
-    return items.filter((task) => {
-      if (!task || !task.task_start_date) return false;
-      const start = new Date(task.task_start_date);
-      if (Number.isNaN(start.getTime())) return false;
-      if (start > endOfToday) return false;
-      return !task.submission_date;
-    });
+  // Return all tasks with start date on/before yesterday and no submission
+  async overdue(options = {}) {
+    const endOfYesterday = getEndOfYesterday();
+    return assignTaskRepository.findOverdue(endOfYesterday, options);
   }
 
   // Return all tasks explicitly marked as not done (status "no")
@@ -288,6 +286,13 @@ class AssignTaskService {
       const status = task && task.status ? String(task.status).trim().toLowerCase() : '';
       return status === 'no';
     });
+  }
+
+  today(options = {}) {
+    const today = new Date();
+    // strip time to avoid TZ issues in ::date comparison
+    today.setHours(0, 0, 0, 0);
+    return assignTaskRepository.findByDate(today, options);
   }
 }
 
