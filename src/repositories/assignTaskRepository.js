@@ -40,6 +40,13 @@ const serializeHod = (value) => {
   return String(value);
 };
 
+const normalizeDepartment = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+const matchesDepartment = (recordDept, filterDept) => {
+  const normalizedFilter = normalizeDepartment(filterDept);
+  if (!normalizedFilter) return true;
+  return normalizeDepartment(recordDept) === normalizedFilter;
+};
+
 class AssignTaskRepository {
   constructor() {
     this.records = [];
@@ -48,14 +55,26 @@ class AssignTaskRepository {
 
   async findAll(options = {}) {
     if (useMemory) {
-      const { limit, offset } = options;
+      const { limit, offset, department } = options;
       const start = Number.isInteger(offset) && offset > 0 ? offset : 0;
       const end = Number.isInteger(limit) && limit > 0 ? start + limit : undefined;
-      return this.records.slice(start, end);
+      const filtered = this.records.filter((r) => matchesDepartment(r.department, department));
+      return filtered.slice(start, end);
     }
 
     const params = [];
-    let sql = 'SELECT * FROM assign_task ORDER BY id ASC';
+    const where = [];
+
+    if (options.department) {
+      params.push(options.department);
+      where.push(`LOWER(department) = LOWER($${params.length})`);
+    }
+
+    let sql = 'SELECT * FROM assign_task';
+    if (where.length) {
+      sql += ` WHERE ${where.join(' AND ')}`;
+    }
+    sql += ' ORDER BY id ASC';
 
     const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
     const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
@@ -90,6 +109,7 @@ class AssignTaskRepository {
         const start = new Date(task.task_start_date);
         if (Number.isNaN(start.getTime())) return false;
         if (start > endTs) return false;
+        if (!matchesDepartment(task.department, options.department)) return false;
         return !task.submission_date;
       });
       const { limit, offset } = options;
@@ -105,8 +125,114 @@ class AssignTaskRepository {
       WHERE submission_date IS NULL
         AND task_start_date IS NOT NULL
         AND task_start_date <= $1
-      ORDER BY task_start_date ASC
     `;
+
+    if (options.department) {
+      params.push(options.department);
+      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+    }
+
+    sql += ' ORDER BY task_start_date ASC';
+
+    const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
+    const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
+
+    if (hasLimit) {
+      params.push(options.limit);
+      sql += ` LIMIT $${params.length}`;
+    }
+    if (hasOffset) {
+      if (!hasLimit) sql += ' LIMIT ALL';
+      params.push(options.offset);
+      sql += ` OFFSET $${params.length}`;
+    }
+
+    const result = await query(sql, params);
+    return result.rows.map(applyComputedDelay);
+  }
+
+  async findPending(cutoff, options = {}) {
+    if (useMemory) {
+      const endTs = cutoff ? cutoff.getTime() : Number.POSITIVE_INFINITY;
+      const filtered = this.records.filter((task) => {
+        if (!task || !task.task_start_date) return false;
+        const start = new Date(task.task_start_date);
+        if (Number.isNaN(start.getTime())) return false;
+        if (start > endTs) return false;
+        if (!matchesDepartment(task.department, options.department)) return false;
+        return !task.submission_date;
+      });
+      const { limit, offset } = options;
+      const start = Number.isInteger(offset) && offset > 0 ? offset : 0;
+      const end = Number.isInteger(limit) && limit > 0 ? start + limit : undefined;
+      return filtered.slice(start, end);
+    }
+
+    const params = [cutoff];
+    let sql = `
+      SELECT *
+      FROM assign_task
+      WHERE submission_date IS NULL
+        AND task_start_date IS NOT NULL
+        AND task_start_date <= $1
+    `;
+
+    if (options.department) {
+      params.push(options.department);
+      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+    }
+
+    sql += ' ORDER BY task_start_date ASC';
+
+    const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
+    const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
+
+    if (hasLimit) {
+      params.push(options.limit);
+      sql += ` LIMIT $${params.length}`;
+    }
+    if (hasOffset) {
+      if (!hasLimit) sql += ' LIMIT ALL';
+      params.push(options.offset);
+      sql += ` OFFSET $${params.length}`;
+    }
+
+    const result = await query(sql, params);
+    return result.rows.map(applyComputedDelay);
+  }
+
+  async findHistory(cutoff, options = {}) {
+    if (useMemory) {
+      const endTs = cutoff ? cutoff.getTime() : Number.POSITIVE_INFINITY;
+      const filtered = this.records.filter((task) => {
+        if (!task || !task.task_start_date) return false;
+        const start = new Date(task.task_start_date);
+        if (Number.isNaN(start.getTime())) return false;
+        if (start > endTs) return false;
+        if (!matchesDepartment(task.department, options.department)) return false;
+        return !!task.submission_date;
+      });
+      const { limit, offset } = options;
+      const startIdx = Number.isInteger(offset) && offset > 0 ? offset : 0;
+      const endIdx = Number.isInteger(limit) && limit > 0 ? startIdx + limit : undefined;
+      return filtered.slice(startIdx, endIdx);
+    }
+
+    const params = [cutoff];
+    let sql = `
+      SELECT *
+      FROM assign_task
+      WHERE submission_date IS NOT NULL
+        AND task_start_date IS NOT NULL
+        AND task_start_date <= $1
+    `;
+
+    if (options.department) {
+      params.push(options.department);
+      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+    }
+
+    sql += ' ORDER BY task_start_date DESC';
 
     const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
     const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
@@ -223,6 +349,7 @@ class AssignTaskRepository {
         if (!task || !task.task_start_date) return false;
         const start = new Date(task.task_start_date);
         if (Number.isNaN(start.getTime())) return false;
+        if (!matchesDepartment(task.department, options.department)) return false;
         return start >= dayStart && start < dayEnd;
       });
 
@@ -237,8 +364,14 @@ class AssignTaskRepository {
       SELECT *
       FROM assign_task
       WHERE task_start_date::date = $1::date
-      ORDER BY id ASC
     `;
+
+    if (options.department) {
+      params.push(options.department);
+      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+    }
+
+    sql += ' ORDER BY id ASC';
 
     const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
     const hasOffset = Number.isInteger(options.offset) && options.offset > 0;

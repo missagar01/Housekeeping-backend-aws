@@ -81,6 +81,7 @@ npm start     # node src/server.js
 
 ### Working Days
 - `GET /api/working-days` — list `working_day` rows.
+  - Response: `[{ "id": 1, "working_date": "2025-12-27" }]`
 
 ### Assign Tasks (`/api/assigntask/generate`)
 - `GET /api/assigntask/generate` — list assignments.
@@ -90,6 +91,47 @@ npm start     # node src/server.js
 - `POST /api/assigntask/generate/:id/confirm` — mark a task as confirmed (writes `attachment = "confirmed"`).
 - `DELETE /api/assigntask/generate/:id` — delete one.
 - `GET /api/assigntask/generate/stats` — totals (total/completed/pending/not done/overdue/progress%).
+- `GET /api/assigntask/generate/overdue` — tasks before/through yesterday with no submission.
+- `GET /api/assigntask/generate/not-done` — tasks marked `status = "no"`.
+- `GET /api/assigntask/generate/today` — tasks whose `task_start_date` is today.
+- Optional query: `limit`, `page` or `offset`, and `department` (for list/overdue/today/not-done).
+
+Example list response (`GET /api/assigntask/generate?limit=2`):
+```json
+[
+  {
+    "id": 1,
+    "task_id": "1",
+    "department": "Maintenance",
+    "given_by": "Supervisor",
+    "name": "John Doe",
+    "task_description": "Clean lobby",
+    "remark": "Prioritize morning",
+    "status": "yes",
+    "image": "/api/uploads/123.png",
+    "attachment": null,
+    "hod": "Alice,Bob",
+    "frequency": "daily",
+    "task_start_date": "2025-12-27T00:00:00.000Z",
+    "submission_date": "2025-12-27T06:30:00.000Z",
+    "delay": 0,
+    "remainder": null,
+    "created_at": "2025-12-26T18:30:00.000Z"
+  }
+]
+```
+
+Example stats response (`GET /api/assigntask/generate/stats` or `/api/dashboard/summary`):
+```json
+{
+  "total": 120,
+  "completed": 80,
+  "pending": 25,
+  "not_done": 10,
+  "overdue": 5,
+  "progress_percent": 67
+}
+```
 
 **POST / PATCH body (JSON or multipart/form-data):**
 - Required for POST: `task_start_date` (ISO datetime).
@@ -105,12 +147,26 @@ npm start     # node src/server.js
 - `POST /api/users` — create (requires `user_name`, `password`; others optional).
 - `PATCH /api/users/:id` — update (partial).
 - `DELETE /api/users/:id` — delete.
+  - Example list response:
+  ```json
+  [
+    {
+      "id": 1,
+      "user_name": "admin",
+      "email_id": "admin@example.com",
+      "department": "HQ",
+      "role": "admin",
+      "status": "active"
+    }
+  ]
+  ```
 
 ### Auth
 - `POST /api/auth/login` — checks `users.user_name` and `password`.
   - Body: `{ "user_name": "<string>", "password": "<string>" }`
   - Success: `{ "message": "Login successful", "user": { "id", "user_name", "role" } }`
   - Failure: HTTP 401.
+- `POST /api/auth/logout` — stateless logout; returns `{ "message": "Logout successful" }` (frontends should clear stored tokens/credentials).
 
 ### Uploads
 - `POST /api/uploads/image` — form-data field `image` (max 5MB); returns `{ "url": "/uploads/<filename>" }`.

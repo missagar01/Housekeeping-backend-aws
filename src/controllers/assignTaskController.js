@@ -76,8 +76,9 @@ const assignTaskController = {
       const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
       const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
       const effectiveOffset = page && limit ? (page - 1) * limit : offset;
+      const department = req.query?.department;
 
-      const items = await assignTaskService.list({ limit, offset: effectiveOffset });
+      const items = await assignTaskService.list({ limit, offset: effectiveOffset, department });
       res.json(items);
     } catch (err) {
       next(err);
@@ -132,8 +133,13 @@ const assignTaskController = {
       const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
       const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
       const effectiveOffset = page && limit ? (page - 1) * limit : offset;
+      const department = req.query?.department;
 
-      const items = await assignTaskService.overdue({ limit, offset: effectiveOffset });
+      const items = await assignTaskService.overdue({
+        limit,
+        offset: effectiveOffset,
+        department
+      });
       res.json(items);
     } catch (err) {
       next(err);
@@ -142,7 +148,8 @@ const assignTaskController = {
 
   async notDone(_req, res, next) {
     try {
-      const items = await assignTaskService.notDone();
+      const department = _req.query?.department;
+      const items = await assignTaskService.notDone({ department });
       res.json(items);
     } catch (err) {
       next(err);
@@ -155,8 +162,51 @@ const assignTaskController = {
       const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
       const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
       const effectiveOffset = page && limit ? (page - 1) * limit : offset;
+      const department = req.query?.department;
 
-      const items = await assignTaskService.today({ limit, offset: effectiveOffset });
+      const items = await assignTaskService.today({
+        limit,
+        offset: effectiveOffset,
+        department
+      });
+      res.json(items);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async pending(req, res, next) {
+    try {
+      const limit = parsePositiveInt(req.query?.limit, { max: 100, defaultValue: 100 });
+      const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
+      const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
+      const effectiveOffset = page && limit ? (page - 1) * limit : offset;
+      const department = req.query?.department;
+
+      const items = await assignTaskService.pending({
+        limit,
+        offset: effectiveOffset,
+        department
+      });
+      res.json(items);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async history(req, res, next) {
+    try {
+      const limit = parsePositiveInt(req.query?.limit, { max: 100, defaultValue: 100 });
+      const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
+      const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
+      const effectiveOffset = page && limit ? (page - 1) * limit : offset;
+      const department = req.query?.department;
+
+      const items = await assignTaskService.history({
+        limit,
+        offset: effectiveOffset,
+        department
+      });
       res.json(items);
     } catch (err) {
       next(err);

@@ -20,6 +20,15 @@ const authController = {
     } catch (err) {
       next(err);
     }
+  },
+
+  // Stateless logout; frontends should clear stored tokens/credentials.
+  async logout(_req, res, next) {
+    try {
+      res.json({ message: 'Logout successful' });
+    } catch (err) {
+      next(err);
+    }
   }
 };
 

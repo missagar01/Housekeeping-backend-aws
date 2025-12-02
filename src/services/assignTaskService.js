@@ -285,8 +285,8 @@ class AssignTaskService {
   }
 
   // Return all tasks explicitly marked as not done (status "no")
-  async notDone() {
-    const items = await this.list();
+  async notDone(options = {}) {
+    const items = await this.list(options);
     return items.filter((task) => {
       const status = task && task.status ? String(task.status).trim().toLowerCase() : '';
       return status === 'no';
@@ -298,6 +298,18 @@ class AssignTaskService {
     // strip time to avoid TZ issues in ::date comparison
     today.setHours(0, 0, 0, 0);
     return assignTaskRepository.findByDate(today, options);
+  }
+
+  pending(options = {}) {
+    const cutoff = new Date();
+    cutoff.setHours(23, 59, 59, 999); // include up to today
+    return assignTaskRepository.findPending(cutoff, options);
+  }
+
+  history(options = {}) {
+    const cutoff = new Date();
+    cutoff.setHours(23, 59, 59, 999); // include up to today
+    return assignTaskRepository.findHistory(cutoff, options);
   }
 }
 

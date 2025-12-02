@@ -81,6 +81,10 @@ router.get('/generate/not-done', assignTaskController.notDone);
 
 router.get('/generate/today', assignTaskController.today);
 
+router.get('/generate/pending', assignTaskController.pending);
+
+router.get('/generate/history', assignTaskController.history);
+
 // Mark an assignment as confirmed (stores marker in attachment column)
 router.post('/generate/:id/confirm', assignTaskController.confirmAttachment);
 
