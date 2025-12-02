@@ -70,6 +70,7 @@ const notifyAssignmentUpdate = async (task) => {
     `Description: ${task.task_description || '-'}`,
     `Status: ${task.status || '-'}`,
     `Remark: ${task.remark || '-'}`,
+     `Doer: ${task.name || '-'}`,
        `Confirm by Hod: ${task.attachment || '-'}`,
     `Date: ${formatLocalDateTime()}`
   ].join('\n');
