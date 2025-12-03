@@ -58,7 +58,16 @@ class AssignTaskRepository {
       const { limit, offset, department } = options;
       const start = Number.isInteger(offset) && offset > 0 ? offset : 0;
       const end = Number.isInteger(limit) && limit > 0 ? start + limit : undefined;
-      const filtered = this.records.filter((r) => matchesDepartment(r.department, department));
+      const filtered = this.records
+        .filter((r) => matchesDepartment(r.department, department))
+        .sort((a, b) => {
+          const aDate = new Date(a.task_start_date || 0);
+          const bDate = new Date(b.task_start_date || 0);
+          const aTs = Number.isNaN(aDate.getTime()) ? 0 : aDate.getTime();
+          const bTs = Number.isNaN(bDate.getTime()) ? 0 : bDate.getTime();
+          if (aTs !== bTs) return bTs - aTs; // newest first
+          return Number(b.id) - Number(a.id);
+        });
       return filtered.slice(start, end);
     }
 
@@ -74,7 +83,7 @@ class AssignTaskRepository {
     if (where.length) {
       sql += ` WHERE ${where.join(' AND ')}`;
     }
-    sql += ' ORDER BY id ASC';
+    sql += ' ORDER BY task_start_date DESC NULLS LAST, id DESC';
 
     const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
     const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
@@ -113,10 +122,7 @@ class AssignTaskRepository {
         if (!matchesDepartment(task.department, options.department)) return false;
         return !task.submission_date;
       });
-      const { limit, offset } = options;
-      const start = Number.isInteger(offset) && offset > 0 ? offset : 0;
-      const end = Number.isInteger(limit) && limit > 0 ? start + limit : undefined;
-      return filtered.slice(start, end);
+      return filtered;
     }
 
     const params = [cutoff];
@@ -134,19 +140,6 @@ class AssignTaskRepository {
     }
 
     sql += ' ORDER BY task_start_date ASC';
-
-    const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
-    const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
-
-    if (hasLimit) {
-      params.push(options.limit);
-      sql += ` LIMIT $${params.length}`;
-    }
-    if (hasOffset) {
-      if (!hasLimit) sql += ' LIMIT ALL';
-      params.push(options.offset);
-      sql += ` OFFSET $${params.length}`;
-    }
 
     const result = await query(sql, params);
     return result.rows.map(applyComputedDelay);
@@ -154,28 +147,35 @@ class AssignTaskRepository {
 
   async findPending(cutoff, options = {}) {
     if (useMemory) {
-      const endTs = cutoff ? cutoff.getTime() : Number.POSITIVE_INFINITY;
+      const cutoffDay = cutoff ? new Date(cutoff) : new Date();
+      cutoffDay.setHours(0, 0, 0, 0);
       const filtered = this.records.filter((task) => {
         if (!task || !task.task_start_date) return false;
         const start = new Date(task.task_start_date);
         if (Number.isNaN(start.getTime())) return false;
-        if (start > endTs) return false;
+        start.setHours(0, 0, 0, 0);
+        if (start.getTime() > cutoffDay.getTime()) return false;
         if (!matchesDepartment(task.department, options.department)) return false;
         return !task.submission_date;
+      }).sort((a, b) => {
+        const aDate = new Date(a.task_start_date);
+        const bDate = new Date(b.task_start_date);
+        const aTs = Number.isNaN(aDate.getTime()) ? 0 : aDate.getTime();
+        const bTs = Number.isNaN(bDate.getTime()) ? 0 : bDate.getTime();
+        if (aTs !== bTs) return bTs - aTs; // newest first
+        return Number(b.id) - Number(a.id);
       });
-      const { limit, offset } = options;
-      const start = Number.isInteger(offset) && offset > 0 ? offset : 0;
-      const end = Number.isInteger(limit) && limit > 0 ? start + limit : undefined;
-      return filtered.slice(start, end);
+      return filtered;
     }
 
-    const params = [cutoff];
+    const effectiveCutoff = cutoff || new Date();
+    const params = [effectiveCutoff];
     let sql = `
       SELECT *
       FROM assign_task
       WHERE submission_date IS NULL
         AND task_start_date IS NOT NULL
-        AND task_start_date <= $1
+        AND task_start_date::date <= $1::date
     `;
 
     if (options.department) {
@@ -183,20 +183,8 @@ class AssignTaskRepository {
       sql += ` AND LOWER(department) = LOWER($${params.length})`;
     }
 
-    sql += ' ORDER BY task_start_date ASC';
-
-    const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
-    const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
-
-    if (hasLimit) {
-      params.push(options.limit);
-      sql += ` LIMIT $${params.length}`;
-    }
-    if (hasOffset) {
-      if (!hasLimit) sql += ' LIMIT ALL';
-      params.push(options.offset);
-      sql += ` OFFSET $${params.length}`;
-    }
+    // Show current/newest dates first for easier review in UI
+    sql += ' ORDER BY task_start_date DESC, id DESC';
 
     const result = await query(sql, params);
     return result.rows.map(applyComputedDelay);
@@ -263,9 +251,10 @@ class AssignTaskRepository {
       const notDone = all.filter((t) => toLower(t.status) === 'no').length;
 
       const active = all.filter((t) => {
-        if (!t.task_start_date) return true;
+        // Only include tasks with start date on/before cutoff
+        if (!t.task_start_date) return false;
         const d = new Date(t.task_start_date);
-        if (Number.isNaN(d.getTime())) return true;
+        if (Number.isNaN(d.getTime())) return false;
         d.setHours(0, 0, 0, 0);
         return d.getTime() <= cutoffDay.getTime();
       });
@@ -304,6 +293,7 @@ class AssignTaskRepository {
       };
     }
 
+    // Active tasks: start date on/before cutoff and no submission => overdue; start date after cutoff => pending
     const sql = `
       WITH base AS (
         SELECT
@@ -311,13 +301,14 @@ class AssignTaskRepository {
           task_start_date,
           submission_date
         FROM assign_task
+        WHERE task_start_date IS NOT NULL
       )
       SELECT
         (SELECT count(*) FROM base WHERE status = 'yes') AS completed,
         (SELECT count(*) FROM base WHERE status = 'no') AS not_done,
-        (SELECT count(*) FROM base WHERE submission_date IS NULL AND task_start_date IS NOT NULL AND task_start_date::date <= $1::date) AS overdue,
-        (SELECT count(*) FROM base WHERE submission_date IS NULL AND task_start_date IS NULL) AS pending,
-        (SELECT count(*) FROM base WHERE task_start_date IS NULL OR task_start_date::date <= $1::date) AS total;
+        (SELECT count(*) FROM base WHERE submission_date IS NULL AND task_start_date::date <= $1::date) AS overdue,
+        (SELECT count(*) FROM base WHERE submission_date IS NULL AND task_start_date::date > $1::date) AS pending,
+        (SELECT count(*) FROM base WHERE task_start_date::date <= $1::date) AS total;
     `;
 
     const result = await query(sql, [cutoff]);
@@ -410,15 +401,15 @@ class AssignTaskRepository {
     const sql = `
       INSERT INTO assign_task (
         id, task_id, department, given_by, name, task_description, remark, status,
-        image, attachment, hod, frequency, task_start_date, submission_date,
+        image, attachment, doer_name2, hod, frequency, task_start_date, submission_date,
         delay, remainder, created_at
       )
       VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8,
-        $9, $10, $11, $12, $13, $14, $15, $16, $17
+        $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
       )
       RETURNING id, task_id, department, given_by, name, task_description, remark, status,
-        image, attachment, hod, frequency, task_start_date, submission_date,
+        image, attachment, doer_name2, hod, frequency, task_start_date, submission_date,
         delay, remainder, created_at;
     `;
 
@@ -433,6 +424,7 @@ class AssignTaskRepository {
       input.status || null,
       input.image || null,
       input.attachment || null,
+      input.doer_name2 || null,
       hod,
       frequency,
       input.task_start_date || null,
@@ -469,6 +461,7 @@ class AssignTaskRepository {
       'status',
       'image',
       'attachment',
+      'doer_name2',
       'hod',
       'frequency',
       'task_start_date',
@@ -549,6 +542,7 @@ class AssignTaskRepository {
       status: input.status || null,
       image: input.image || null,
       attachment: input.attachment || null,
+      doer_name2: input.doer_name2 || null,
       hod: input.hod || null,
       frequency,
       task_start_date: input.task_start_date || null,

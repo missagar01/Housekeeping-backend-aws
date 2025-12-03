@@ -26,6 +26,15 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
+// Run multer only when the request is multipart; otherwise defer to body parsers.
+const maybeMultipartFields = (req, res, next) => {
+  const contentType = (req.headers['content-type'] || '').toLowerCase();
+  if (contentType.includes('multipart/form-data')) {
+    return upload.none()(req, res, next);
+  }
+  return next();
+};
+
 const router = Router();
 
 const normalizeItem = (item, file) => {
@@ -86,7 +95,13 @@ router.get('/generate/pending', assignTaskController.pending);
 router.get('/generate/history', assignTaskController.history);
 
 // Mark an assignment as confirmed (stores marker in attachment column)
-router.post('/generate/:id/confirm', assignTaskController.confirmAttachment);
+router
+  .route('/generate/:id/confirm')
+  .post(
+    maybeMultipartFields, // allow multipart/form-data (fields only) so remark/attachment are captured
+    assignTaskController.confirmAttachment
+  )
+
 
 router
   .route('/generate/:id')

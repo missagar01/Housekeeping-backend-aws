@@ -20,6 +20,44 @@ const normalizeFrequency = (value, { defaultValue } = {}) => {
   return defaultValue !== undefined ? defaultValue : lower;
 };
 
+const safeJsonParse = (value) => {
+  try {
+    return JSON.parse(value);
+  } catch (_e) {
+    return {};
+  }
+};
+
+const extractRemark = (body = {}, query = {}) => {
+  // Accept common variants and arrays; return undefined if nothing usable.
+  const candidates = [
+    body.remark,
+    body['remark:'],
+    body['remark '],
+    body['Remark'],
+    body['remark[]'],
+    query.remark
+  ];
+  const found = candidates.find((v) => v !== undefined && v !== null);
+  if (Array.isArray(found)) return found[0];
+  if (Buffer.isBuffer(found)) return found.toString();
+  return found;
+};
+
+const extractAttachment = (body = {}, query = {}) => {
+  const candidates = [
+    body.attachment,
+    body['attachment[]'],
+    body['attachment '],
+    body['Attachment'],
+    query.attachment
+  ];
+  const found = candidates.find((v) => v !== undefined && v !== null);
+  if (Array.isArray(found)) return found[0];
+  if (Buffer.isBuffer(found)) return found.toString();
+  return found;
+};
+
 const prepareCreatePayload = (payload = {}) => {
   const frequency = normalizeFrequency(payload.frequency, { defaultValue: 'daily' });
   if (frequency === 'one-time' && !payload.task_start_date) {
@@ -216,10 +254,24 @@ const assignTaskController = {
   // Mark an assignment as confirmed (stores marker in attachment column)
   async confirmAttachment(req, res, next) {
     try {
-      const attachmentValue = req.body && req.body.attachment
-        ? String(req.body.attachment)
+      const body = typeof req.body === 'string' ? safeJsonParse(req.body) : (req.body || {});
+      const payload = {};
+
+      const attachmentValue = extractAttachment(body, req.query);
+      payload.attachment = attachmentValue !== undefined && attachmentValue !== null
+        ? String(attachmentValue)
         : 'confirmed';
-      const updated = await assignTaskService.update(req.params.id, { attachment: attachmentValue });
+
+      // Prefer explicit remark key if present; otherwise accept common variants.
+      const explicitRemark = Object.prototype.hasOwnProperty.call(body, 'remark')
+        ? body.remark
+        : undefined;
+      const remarkValue = explicitRemark !== undefined ? explicitRemark : extractRemark(body, req.query);
+      if (remarkValue !== undefined && remarkValue !== null) {
+        payload.remark = String(remarkValue);
+      }
+
+      const updated = await assignTaskService.update(req.params.id, payload);
       if (!updated) throw new ApiError(404, 'Assignment not found');
       res.json(updated);
     } catch (err) {
