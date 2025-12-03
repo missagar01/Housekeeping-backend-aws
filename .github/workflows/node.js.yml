@@ -2,7 +2,7 @@ name: "🚀 Node.js CI & Deploy to EC2"
 
 on:
   push:
-    branches: ["master"]  # deploy only from master
+    branches: ["master"] # deploy only from master
   workflow_dispatch:
 
 jobs:
@@ -15,34 +15,24 @@ jobs:
     env:
       RUNNER_TEMP: /home/ubuntu/actions-runner/_temp
       RUNNER_TOOL_CACHE: /home/ubuntu/actions-runner/_tool
-      DEPLOY_DIR: /home/ubuntu/housekeeping-backend
-      APP_NAME: housekeeping-backend
-
+      DEPLOY_DIR: /home/ubuntu/Housekeeping-backend
       NODE_ENV: production
       PORT: 3005
       LOG_LEVEL: info
-
       PG_HOST: ${{ secrets.PG_HOST }}
       PG_PORT: 5432
       PG_USER: ${{ secrets.PG_USER }}
       PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
       PG_DATABASE: ${{ secrets.PG_DATABASE }}
       PG_SSL: true
-
       DB_HOST: ${{ secrets.DB_HOST }}
       DB_PORT: 5432
       DB_USER: ${{ secrets.DB_USER }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       DB_NAME: ${{ secrets.DB_NAME }}
       DB_SSL: true
-
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       JWT_EXPIRES_IN: 30d
-
-      MAYTAPI_PRODUCT_ID: ${{ secrets.MAYTAPI_PRODUCT_ID }}
-      MAYTAPI_PHONE_ID: ${{ secrets.MAYTAPI_PHONE_ID }}
-      MAYTAPI_TOKEN: ${{ secrets.MAYTAPI_TOKEN }}
-      MAYTAPI_GROUP_ID: ${{ secrets.MAYTAPI_GROUP_ID }}
 
     steps:
       - name: "📥 Checkout code"
@@ -86,6 +76,8 @@ jobs:
             sudo npm i -g pm2
           fi
 
+          APP_NAME="housekeeping-backend"
+
           cd "$DEPLOY_DIR"
 
           echo "Writing .env from workflow secrets..."
@@ -110,22 +102,16 @@ jobs:
 
           JWT_SECRET=${JWT_SECRET}
           JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+          EOF
 
-          MAYTAPI_PRODUCT_ID=${MAYTAPI_PRODUCT_ID}
-          MAYTAPI_PHONE_ID=${MAYTAPI_PHONE_ID}
-          MAYTAPI_TOKEN=${MAYTAPI_TOKEN}
-          MAYTAPI_GROUP_ID=${MAYTAPI_GROUP_ID}
-EOF
-
-          echo "📦 Installing production dependencies in $DEPLOY_DIR ..."
-          npm ci --omit=dev
+          npm ci
 
           if pm2 describe "${APP_NAME}" >/dev/null 2>&1; then
             echo "🌀 Existing PM2 process मिला, reload कर रहे हैं…"
             pm2 reload "${APP_NAME}" --update-env
           else
             echo "✨ PM2 process नहीं मिला, नया start कर रहे हैं…"
-            pm2 start src/server.js --name "${APP_NAME}"
+            pm2 start "$DEPLOY_DIR/src/server.js" --name "${APP_NAME}"
           fi
 
           pm2 save || true
