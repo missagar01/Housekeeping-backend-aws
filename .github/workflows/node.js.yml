@@ -1,8 +1,8 @@
-name: "🚀 Node.js CI & Deploy to EC2"
+name: 🚀 Auto Deploy to EC2 (Housekeeping Backend)
 
 on:
   push:
-    branches: ["main"] # ya "master" agar wahi branch use karte ho
+    branches: ["master"]      # If your main branch is "main", change it
   workflow_dispatch:
 
 jobs:
@@ -13,15 +13,15 @@ jobs:
       - X64
 
     env:
-      RUNNER_TEMP: /home/ubuntu/actions-runner/_temp
-      RUNNER_TOOL_CACHE: /home/ubuntu/actions-runner/_tool
       DEPLOY_DIR: /home/ubuntu/housekeeping-backend
       APP_NAME: housekeeping-backend
 
+      # App runtime env
       NODE_ENV: production
       PORT: 3005
       LOG_LEVEL: info
 
+      # DB SECRETS
       PG_HOST: ${{ secrets.PG_HOST }}
       PG_PORT: 5432
       PG_USER: ${{ secrets.PG_USER }}
@@ -29,62 +29,44 @@ jobs:
       PG_DATABASE: ${{ secrets.PG_DATABASE }}
       PG_SSL: true
 
-      DB_HOST: ${{ secrets.DB_HOST }}
-      DB_PORT: 5432
-      DB_USER: ${{ secrets.DB_USER }}
-      DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-      DB_NAME: ${{ secrets.DB_NAME }}
-      DB_SSL: true
-
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       JWT_EXPIRES_IN: 30d
 
     steps:
-      - name: "📥 Checkout code"
+      - name: "📥 Checkout Code"
         uses: actions/checkout@v4
-
-      - name: "🛠 Prepare temp/cache dirs"
-        run: |
-          mkdir -p "$RUNNER_TEMP" "$RUNNER_TOOL_CACHE"
 
       - name: "🟢 Setup Node.js"
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
+          cache: "npm"
 
-      - name: "📦 Install dependencies (CI workspace)"
+      - name: "📦 Install Dependencies (CI workspace)"
         run: npm ci
 
-      - name: "🧪 Build (if script exists)"
+      - name: "🧪 Build if build script exists"
         run: |
-          if node -e "const p=require('./package.json'); process.exit(p?.scripts?.build ? 0 : 1)"; then
-            echo "✅ Build script मिला, npm run build चला रहे हैं…"
+          if npm run | grep -q "build"; then
+            echo "🚀 Running build..."
             npm run build
           else
-            echo "ℹ️ Build script नहीं मिला, build step skip कर रहे हैं।"
+            echo "ℹ️ No build script found. Skipping build."
           fi
 
-      - name: "📂 Sync code to deploy directory"
+      - name: "📂 Sync Code to EC2 Deploy Directory"
         run: |
-          echo "Syncing code to $DEPLOY_DIR ..."
+          echo "Syncing project to EC2 deploy directory..."
           mkdir -p "$DEPLOY_DIR"
-          rsync -av --delete --exclude '.git' --exclude 'node_modules' ./ "$DEPLOY_DIR"/
+          rsync -av --delete \
+            --exclude ".git" \
+            --exclude "node_modules" \
+            ./ "$DEPLOY_DIR"/
 
-      - name: "🚀 Deploy with PM2 (src/server.js)"
-        shell: bash
+      - name: "🔐 Generate .env File in EC2 Deploy Directory"
         run: |
-          set -e
-
-          if ! command -v pm2 >/dev/null 2>&1; then
-            echo "PM2 नहीं मिला, install कर रहे हैं…"
-            sudo npm i -g pm2
-          fi
-
           cd "$DEPLOY_DIR"
-
-          echo "Writing .env from workflow secrets..."
-          cat > .env <<EOF
+          cat <<EOF > .env
 NODE_ENV=${NODE_ENV}
 PORT=${PORT}
 LOG_LEVEL=${LOG_LEVEL}
@@ -96,29 +78,29 @@ PG_PASSWORD=${PG_PASSWORD}
 PG_DATABASE=${PG_DATABASE}
 PG_SSL=${PG_SSL}
 
-DB_HOST=${DB_HOST}
-DB_PORT=${DB_PORT}
-DB_USER=${DB_USER}
-DB_PASSWORD=${DB_PASSWORD}
-DB_NAME=${DB_NAME}
-DB_SSL=${DB_SSL}
-
 JWT_SECRET=${JWT_SECRET}
 JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
 EOF
 
-          echo "📦 Installing production dependencies in $DEPLOY_DIR ..."
+      - name: "🚀 Start / Restart with PM2"
+        run: |
+          cd "$DEPLOY_DIR"
+
+          echo "📦 Installing production dependencies..."
           npm ci --omit=dev
 
-          if pm2 describe "${APP_NAME}" >/dev/null 2>&1; then
-            echo "🌀 Existing PM2 process मिला, RESTART कर रहे हैं…"
-            pm2 restart "${APP_NAME}" --update-env
+          if ! command -v pm2 >/dev/null 2>&1; then
+            echo "📌 Installing PM2..."
+            sudo npm install -g pm2
+          fi
+
+          if pm2 describe "$APP_NAME" >/dev/null 2>&1; then
+            echo "🔁 Restarting existing PM2 process..."
+            pm2 restart "$APP_NAME" --update-env
           else
-            echo "✨ PM2 process नहीं मिला, नया start कर रहे हैं…"
-            pm2 start src/server.js --name "${APP_NAME}"
+            echo "✨ Starting new PM2 process..."
+            pm2 start src/server.js --name "$APP_NAME"
           fi
 
           pm2 save || true
-
-          echo "✅ PM2 status:"
           pm2 status
