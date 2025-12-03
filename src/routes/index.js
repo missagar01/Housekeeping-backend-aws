@@ -8,10 +8,10 @@ const userRoutes = require('./userRoutes');
 
 const router = Router();
 
+router.use('/auth', authRoutes);
 router.use('/assigntask', assignTaskRoutes);
 router.use('/uploads', uploadRoutes);
 router.use('/working-days', workingDayRoutes);
-router.use('/auth', authRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/users', userRoutes);
 

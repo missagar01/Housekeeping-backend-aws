@@ -2,6 +2,7 @@ const { Router } = require('express');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const { requireAuth } = require('../middleware/auth');
 
 // Use the project-level uploads directory (same as app.js)
 const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
@@ -24,6 +25,7 @@ const upload = multer({
 });
 
 const router = Router();
+router.use(requireAuth);
 
 router.post('/image', upload.single('image'), (req, res) => {
   if (!req.file) {

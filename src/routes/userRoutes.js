@@ -2,8 +2,12 @@ const { Router } = require('express');
 const { userController } = require('../controllers/userController');
 const { validateBody } = require('../middleware/validate');
 const { userSchema, updateUserSchema } = require('../models/user');
+const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = Router();
+
+// router.use(requireAuth);
+router.use(requireAdmin);
 
 router
   .route('/')

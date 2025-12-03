@@ -5,6 +5,7 @@ const { Router } = require('express');
 const { assignTaskController } = require('../controllers/assignTaskController');
 const { validateBody } = require('../middleware/validate');
 const { assignTaskSchema, updateAssignTaskSchema } = require('../models/assignTask');
+const { requireAuth } = require('../middleware/auth');
 
 // Use the project-level uploads directory (same as app.js)
 const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
@@ -36,6 +37,8 @@ const maybeMultipartFields = (req, res, next) => {
 };
 
 const router = Router();
+// Require a valid token for all assignment routes; per-role filtering is handled inside controllers
+router.use(requireAuth);
 
 const normalizeItem = (item, file) => {
   if (item && item.delay !== undefined) {
@@ -101,6 +104,7 @@ router
     maybeMultipartFields, // allow multipart/form-data (fields only) so remark/attachment are captured
     assignTaskController.confirmAttachment
   )
+
 
 
 router
