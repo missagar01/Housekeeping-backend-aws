@@ -334,8 +334,9 @@ class AssignTaskRepository {
 
     const today = new Date();
     today.setHours(0, 0, 0, 0); // use current local day as today
+    const todayDate = today.toISOString().slice(0, 10); // YYYY-MM-DD to avoid TZ drift in PG
 
-    const result = await query(sql, [today]);
+    const result = await query(sql, [todayDate]);
     const row = result.rows[0] || {};
     const total = Number(row.total) || 0;
     const completed = Number(row.completed) || 0;
