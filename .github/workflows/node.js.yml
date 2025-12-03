@@ -89,7 +89,7 @@ jobs:
           cd "$DEPLOY_DIR"
 
           echo "Writing .env from workflow secrets..."
-          cat << EOF > .env
+          cat > .env <<EOF
 NODE_ENV=${NODE_ENV}
 PORT=${PORT}
 LOG_LEVEL=${LOG_LEVEL}
