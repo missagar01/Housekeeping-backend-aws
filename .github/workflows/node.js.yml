@@ -2,7 +2,7 @@ name: "🚀 Node.js CI & Deploy to EC2"
 
 on:
   push:
-    branches: ["master"] # deploy only from master
+    branches: ["main"] # ya "master" agar wahi branch use karte ho
   workflow_dispatch:
 
 jobs:
@@ -16,21 +16,26 @@ jobs:
       RUNNER_TEMP: /home/ubuntu/actions-runner/_temp
       RUNNER_TOOL_CACHE: /home/ubuntu/actions-runner/_tool
       DEPLOY_DIR: /home/ubuntu/housekeeping-backend
+      APP_NAME: housekeeping-backend
+
       NODE_ENV: production
       PORT: 3005
       LOG_LEVEL: info
+
       PG_HOST: ${{ secrets.PG_HOST }}
       PG_PORT: 5432
       PG_USER: ${{ secrets.PG_USER }}
       PG_PASSWORD: ${{ secrets.PG_PASSWORD }}
       PG_DATABASE: ${{ secrets.PG_DATABASE }}
       PG_SSL: true
+
       DB_HOST: ${{ secrets.DB_HOST }}
       DB_PORT: 5432
       DB_USER: ${{ secrets.DB_USER }}
       DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
       DB_NAME: ${{ secrets.DB_NAME }}
       DB_SSL: true
+
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
       JWT_EXPIRES_IN: 30d
 
@@ -48,7 +53,7 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: "📦 Install dependencies (workspace)"
+      - name: "📦 Install dependencies (CI workspace)"
         run: npm ci
 
       - name: "🧪 Build (if script exists)"
@@ -76,42 +81,41 @@ jobs:
             sudo npm i -g pm2
           fi
 
-          APP_NAME="housekeeping-backend"
-
           cd "$DEPLOY_DIR"
 
           echo "Writing .env from workflow secrets..."
           cat > .env <<EOF
-          NODE_ENV=${NODE_ENV}
-          PORT=${PORT}
-          LOG_LEVEL=${LOG_LEVEL}
+NODE_ENV=${NODE_ENV}
+PORT=${PORT}
+LOG_LEVEL=${LOG_LEVEL}
 
-          PG_HOST=${PG_HOST}
-          PG_PORT=${PG_PORT}
-          PG_USER=${PG_USER}
-          PG_PASSWORD=${PG_PASSWORD}
-          PG_DATABASE=${PG_DATABASE}
-          PG_SSL=${PG_SSL}
+PG_HOST=${PG_HOST}
+PG_PORT=${PG_PORT}
+PG_USER=${PG_USER}
+PG_PASSWORD=${PG_PASSWORD}
+PG_DATABASE=${PG_DATABASE}
+PG_SSL=${PG_SSL}
 
-          DB_HOST=${DB_HOST}
-          DB_PORT=${DB_PORT}
-          DB_USER=${DB_USER}
-          DB_PASSWORD=${DB_PASSWORD}
-          DB_NAME=${DB_NAME}
-          DB_SSL=${DB_SSL}
+DB_HOST=${DB_HOST}
+DB_PORT=${DB_PORT}
+DB_USER=${DB_USER}
+DB_PASSWORD=${DB_PASSWORD}
+DB_NAME=${DB_NAME}
+DB_SSL=${DB_SSL}
 
-          JWT_SECRET=${JWT_SECRET}
-          JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
-          EOF
+JWT_SECRET=${JWT_SECRET}
+JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
+EOF
 
-          npm ci
+          echo "📦 Installing production dependencies in $DEPLOY_DIR ..."
+          npm ci --omit=dev
 
           if pm2 describe "${APP_NAME}" >/dev/null 2>&1; then
-            echo "🌀 Existing PM2 process मिला, reload कर रहे हैं…"
-            pm2 reload "${APP_NAME}" --update-env
+            echo "🌀 Existing PM2 process मिला, RESTART कर रहे हैं…"
+            pm2 restart "${APP_NAME}" --update-env
           else
             echo "✨ PM2 process नहीं मिला, नया start कर रहे हैं…"
-            pm2 start "$DEPLOY_DIR/src/server.js" --name "${APP_NAME}"
+            pm2 start src/server.js --name "${APP_NAME}"
           fi
 
           pm2 save || true
