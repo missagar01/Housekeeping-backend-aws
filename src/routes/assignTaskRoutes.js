@@ -40,7 +40,15 @@ const router = Router();
 // Require a valid token for all assignment routes; per-role filtering is handled inside controllers
 router.use(requireAuth);
 
-const normalizeItem = (item, file) => {
+const buildImageUrl = (req, file) => {
+  if (!file) return undefined;
+  const host = req.get('host');
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+  const base = host ? `${proto}://${host}` : '';
+  return `${base}/api/uploads/${file.filename}`;
+};
+
+const normalizeItem = (req, item, file) => {
   if (item && item.delay !== undefined) {
     const n = Number(item.delay);
     if (!Number.isNaN(n)) {
@@ -51,8 +59,7 @@ const normalizeItem = (item, file) => {
   }
 
   if (file) {
-    // Prefer /api/uploads so the URL works with the API base path
-    item.image = `/api/uploads/${file.filename}`;
+    item.image = buildImageUrl(req, file);
   }
 
   // Fix common key typos from clients
@@ -68,9 +75,9 @@ const normalizeItem = (item, file) => {
 
 const normalizeBody = (req, _res, next) => {
   if (Array.isArray(req.body)) {
-    req.body.forEach((item) => normalizeItem(item, req.file));
+    req.body.forEach((item) => normalizeItem(req, item, req.file));
   } else {
-    normalizeItem(req.body, req.file);
+    normalizeItem(req, req.body, req.file);
   }
   next();
 };
@@ -101,7 +108,7 @@ router.get('/generate/history', assignTaskController.history);
 router
   .route('/generate/:id/confirm')
   .post(
-    maybeMultipartFields, // allow multipart/form-data (fields only) so remark/attachment are captured
+    upload.single('image'), // allow optional image upload along with remark/attachment
     assignTaskController.confirmAttachment
   )
 

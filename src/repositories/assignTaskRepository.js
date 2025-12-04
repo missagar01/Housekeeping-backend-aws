@@ -9,6 +9,10 @@ const normalizeFrequency = (value) => {
   return ALLOWED_FREQUENCIES.includes(lower) ? lower : 'daily';
 };
 
+const isConfirmedAttachment = (value) => {
+  if (!value) return false;
+  return String(value).trim().toLowerCase() === 'confirmed';
+};
 
 const computeDelay = (start, submission) => {
   if (!start || !submission) return null;
@@ -168,6 +172,9 @@ class AssignTaskRepository {
         if (!matchesAssignee(task, options.assignedTo)) return false;
         return !task.submission_date;
       }).sort((a, b) => {
+        const aConfirmed = isConfirmedAttachment(a.attachment);
+        const bConfirmed = isConfirmedAttachment(b.attachment);
+        if (aConfirmed !== bConfirmed) return aConfirmed ? -1 : 1; // confirmed first
         const aDate = new Date(a.task_start_date);
         const bDate = new Date(b.task_start_date);
         const aTs = Number.isNaN(aDate.getTime()) ? 0 : aDate.getTime();
@@ -197,8 +204,13 @@ class AssignTaskRepository {
       sql += ` AND (LOWER(name) = LOWER($${params.length}) OR LOWER(doer_name2) = LOWER($${params.length}))`;
     }
 
-    // Show current/newest dates first for easier review in UI
-    sql += ' ORDER BY task_start_date DESC, id DESC';
+    // Show confirmed rows first, then current/newest dates
+    sql += `
+      ORDER BY
+        CASE WHEN LOWER(attachment) = 'confirmed' THEN 0 ELSE 1 END,
+        task_start_date DESC,
+        id DESC
+    `;
 
     const result = await query(sql, params);
     return result.rows.map(applyComputedDelay);

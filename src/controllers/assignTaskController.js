@@ -20,6 +20,23 @@ const normalizeFrequency = (value, { defaultValue } = {}) => {
   return defaultValue !== undefined ? defaultValue : lower;
 };
 
+const toUploadedPath = (req, file) => {
+  if (!file) return undefined;
+  const host = req.get('host');
+  const proto = req.get('x-forwarded-proto') || req.protocol || 'http';
+  const base = host ? `${proto}://${host}` : '';
+  // Use /api/uploads so the path works with the API base
+  return `${base}/api/uploads/${file.filename}`;
+};
+
+const toUploadedMeta = (req, file) => {
+  if (!file) return undefined;
+  return {
+    id: file.filename,
+    url: toUploadedPath(req, file)
+  };
+};
+
 const safeJsonParse = (value) => {
   try {
     return JSON.parse(value);
@@ -58,6 +75,18 @@ const extractAttachment = (body = {}, query = {}) => {
   return found;
 };
 
+const extractDoerName2 = (body = {}, query = {}) => {
+  const candidates = [
+    body.doer_name2,
+    body['doer_name2[]'],
+    query.doer_name2
+  ];
+  const found = candidates.find((v) => v !== undefined && v !== null);
+  if (Array.isArray(found)) return found[0];
+  if (Buffer.isBuffer(found)) return found.toString();
+  return found;
+};
+
 const prepareCreatePayload = (payload = {}) => {
   const frequency = normalizeFrequency(payload.frequency, { defaultValue: 'daily' });
   if (frequency === 'one-time' && !payload.task_start_date) {
@@ -82,7 +111,8 @@ const assignTaskController = {
     try {
       const prepared = prepareCreatePayload(req.body);
       const created = await assignTaskService.create(prepared);
-      res.status(201).json(created);
+      const meta = toUploadedMeta(req, req.file);
+      res.status(201).json(meta ? { ...created, uploaded_image: meta } : created);
     } catch (err) {
       next(err);
     }
@@ -140,7 +170,8 @@ const assignTaskController = {
       if (!updated) throw new ApiError(404, 'Assignment not found');
       // Fire-and-forget notification; internal errors are logged inside the notifier.
       notifyAssignmentUpdate(updated);
-      res.json(updated);
+      const meta = toUploadedMeta(req, req.file);
+      res.json(meta ? { ...updated, uploaded_image: meta } : updated);
     } catch (err) {
       next(err);
     }
@@ -257,6 +288,12 @@ const assignTaskController = {
       const body = typeof req.body === 'string' ? safeJsonParse(req.body) : (req.body || {});
       const payload = {};
 
+      const uploadedImage = toUploadedPath(req, req.file);
+      const uploadedMeta = toUploadedMeta(req, req.file);
+      if (uploadedImage) {
+        payload.image = uploadedImage;
+      }
+
       const attachmentValue = extractAttachment(body, req.query);
       payload.attachment = attachmentValue !== undefined && attachmentValue !== null
         ? String(attachmentValue)
@@ -271,9 +308,14 @@ const assignTaskController = {
         payload.remark = String(remarkValue);
       }
 
+      const doerName2Value = extractDoerName2(body, req.query);
+      if (doerName2Value !== undefined && doerName2Value !== null) {
+        payload.doer_name2 = String(doerName2Value);
+      }
+
       const updated = await assignTaskService.update(req.params.id, payload);
       if (!updated) throw new ApiError(404, 'Assignment not found');
-      res.json(updated);
+      res.json(uploadedMeta ? { ...updated, uploaded_image: uploadedMeta } : updated);
     } catch (err) {
       next(err);
     }
