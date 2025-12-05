@@ -288,8 +288,14 @@ const assignTaskController = {
       const body = typeof req.body === 'string' ? safeJsonParse(req.body) : (req.body || {});
       const payload = {};
 
-      const uploadedImage = toUploadedPath(req, req.file);
-      const uploadedMeta = toUploadedMeta(req, req.file);
+      const fileFromFields =
+        req.file ||
+        (req.files && Array.isArray(req.files) && req.files[0]) ||
+        (req.files && req.files.image && req.files.image[0]) ||
+        (req.files && req.files.upload && req.files.upload[0]);
+
+      const uploadedImage = toUploadedPath(req, fileFromFields);
+      const uploadedMeta = toUploadedMeta(req, fileFromFields);
       if (uploadedImage) {
         payload.image = uploadedImage;
       }

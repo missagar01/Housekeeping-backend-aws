@@ -27,6 +27,12 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
+// Accept either "image" (current) or "upload" (some clients) for confirm route
+const confirmUpload = upload.fields([
+  { name: 'image', maxCount: 1 },
+  { name: 'upload', maxCount: 1 }
+]);
+
 // Run multer only when the request is multipart; otherwise defer to body parsers.
 const maybeMultipartFields = (req, res, next) => {
   const contentType = (req.headers['content-type'] || '').toLowerCase();
@@ -108,11 +114,9 @@ router.get('/generate/history', assignTaskController.history);
 router
   .route('/generate/:id/confirm')
   .post(
-    upload.single('image'), // allow optional image upload along with remark/attachment
+    confirmUpload, // allow optional image upload along with remark/attachment
     assignTaskController.confirmAttachment
   )
-
-
 
 router
   .route('/generate/:id')
