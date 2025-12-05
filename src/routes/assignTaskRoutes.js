@@ -27,11 +27,8 @@ const upload = multer({
   limits: { fileSize: 5 * 1024 * 1024 } // 5MB
 });
 
-// Accept either "image" (current) or "upload" (some clients) for confirm route
-const confirmUpload = upload.fields([
-  { name: 'image', maxCount: 1 },
-  { name: 'upload', maxCount: 1 }
-]);
+// Accept any single file field for confirm route to avoid "Unexpected field" from multer
+const confirmUpload = upload.any(); // we still have a 5MB file size limit above
 
 // Run multer only when the request is multipart; otherwise defer to body parsers.
 const maybeMultipartFields = (req, res, next) => {
