@@ -244,6 +244,55 @@ const assignTaskController = {
     }
   },
 
+  async tomorrow(req, res, next) {
+    try {
+      const limit = parsePositiveInt(req.query?.limit, { max: 100, defaultValue: 100 });
+      const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
+      const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
+      const effectiveOffset = page && limit ? (page - 1) * limit : offset;
+      const department = req.query?.department;
+
+      const items = await assignTaskService.tomorrow({
+        limit,
+        offset: effectiveOffset,
+        department
+      });
+      res.json(items);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async countToday(req, res, next) {
+    try {
+      const department = req.query?.department;
+      const count = await assignTaskService.countToday({ department });
+      res.json({ count });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async countTomorrow(req, res, next) {
+    try {
+      const department = req.query?.department;
+      const count = await assignTaskService.countTomorrow({ department });
+      res.json({ count });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async countOverdue(req, res, next) {
+    try {
+      const department = req.query?.department;
+      const count = await assignTaskService.countOverdue({ department });
+      res.json({ count });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async pending(req, res, next) {
     try {
       const limit = parsePositiveInt(req.query?.limit, { max: 100, defaultValue: 100 });

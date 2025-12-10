@@ -27,6 +27,26 @@ const computeDelay = (start, submission) => {
   return diffDays > 0 ? diffDays : 0;
 };
 
+// Format date to dd/mm/yyyy hh:mm:ss
+const formatDate = (dateString) => {
+  if (!dateString) return dateString;
+  try {
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return dateString;
+    
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    const seconds = String(date.getSeconds()).padStart(2, '0');
+    
+    return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+  } catch (e) {
+    return dateString;
+  }
+};
+
 const applyComputedDelay = (record) => {
   if (!record) return record;
   if (record.delay === null || record.delay === undefined) {
@@ -34,6 +54,19 @@ const applyComputedDelay = (record) => {
     if (computed !== null) return { ...record, delay: computed };
   }
   return record;
+};
+
+// Format task_start_date and submission_date for dashboard APIs
+const formatTaskDates = (record) => {
+  if (!record) return record;
+  const formatted = { ...record };
+  if (record.task_start_date) {
+    formatted.task_start_date = formatDate(record.task_start_date);
+  }
+  if (record.submission_date) {
+    formatted.submission_date = formatDate(record.submission_date);
+  }
+  return formatted;
 };
 
 const serializeHod = (value) => {
@@ -60,6 +93,19 @@ const matchesAssignee = (record, assignedTo) => {
   return name === target || doer === target;
 };
 
+const padTwo = (value) => String(value).padStart(2, '0');
+const formatLocalDateString = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  date.setHours(0, 0, 0, 0);
+  return `${date.getFullYear()}-${padTwo(date.getMonth() + 1)}-${padTwo(date.getDate())}`;
+};
+
 class AssignTaskRepository {
   constructor() {
     this.records = [];
@@ -81,7 +127,7 @@ class AssignTaskRepository {
           if (aTs !== bTs) return bTs - aTs; // newest first
           return Number(b.id) - Number(a.id);
         });
-      return filtered.slice(start, end);
+      return filtered.slice(start, end).map(record => formatTaskDates(applyComputedDelay(record)));
     }
 
     const params = [];
@@ -113,15 +159,17 @@ class AssignTaskRepository {
 
     
     const result = await query(sql, params);
-    return result.rows.map(applyComputedDelay);
+    return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
   }
 
   async findById(id) {
     if (useMemory) {
-      return this.records.find((r) => String(r.id) === String(id));
+      const record = this.records.find((r) => String(r.id) === String(id));
+      return record ? formatTaskDates(applyComputedDelay(record)) : undefined;
     }
     const result = await query('SELECT * FROM assign_task WHERE id = $1', [id]);
-    return applyComputedDelay(result.rows[0]);
+    const record = result.rows[0];
+    return record ? formatTaskDates(applyComputedDelay(record)) : undefined;
   }
 
   async findOverdue(cutoff, options = {}) {
@@ -135,16 +183,24 @@ class AssignTaskRepository {
         if (!matchesDepartment(task.department, options.department)) return false;
         return !task.submission_date;
       });
-      return filtered;
+      return filtered.map(record => formatTaskDates(applyComputedDelay(record)));
     }
 
-    const params = [cutoff];
+    // Use today's date (not cutoff) for comparison: task_start_date < today
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayDate = formatLocalDateString(today);
+    if (!todayDate) {
+      return 0;
+    }
+    
+    const params = [todayDate];
     let sql = `
       SELECT *
       FROM assign_task
       WHERE submission_date IS NULL
         AND task_start_date IS NOT NULL
-        AND task_start_date <= $1
+        AND task_start_date::date < $1::date
     `;
 
     if (options.department) {
@@ -155,7 +211,7 @@ class AssignTaskRepository {
     sql += ' ORDER BY task_start_date ASC';
 
     const result = await query(sql, params);
-    return result.rows.map(applyComputedDelay);
+    return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
   }
 
   async findPending(cutoff, options = {}) {
@@ -182,7 +238,7 @@ class AssignTaskRepository {
         if (aTs !== bTs) return bTs - aTs; // newest first
         return Number(b.id) - Number(a.id);
       });
-      return filtered;
+      return filtered.map(record => formatTaskDates(applyComputedDelay(record)));
     }
 
     const effectiveCutoff = cutoff || new Date();
@@ -213,7 +269,7 @@ class AssignTaskRepository {
     `;
 
     const result = await query(sql, params);
-    return result.rows.map(applyComputedDelay);
+    return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
   }
 
   async findHistory(cutoff, options = {}) {
@@ -231,7 +287,7 @@ class AssignTaskRepository {
       const { limit, offset } = options;
       const startIdx = Number.isInteger(offset) && offset > 0 ? offset : 0;
       const endIdx = Number.isInteger(limit) && limit > 0 ? startIdx + limit : undefined;
-      return filtered.slice(startIdx, endIdx);
+      return filtered.slice(startIdx, endIdx).map(record => formatTaskDates(applyComputedDelay(record)));
     }
 
     const params = [cutoff];
@@ -268,7 +324,7 @@ class AssignTaskRepository {
     }
 
     const result = await query(sql, params);
-    return result.rows.map(applyComputedDelay);
+    return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
   }
 
   async aggregateStats(cutoff) {
@@ -294,6 +350,12 @@ class AssignTaskRepository {
 
       let overdue = 0;
       let pending = 0;
+      let upcoming = 0;
+      
+      // Calculate tomorrow for range check
+      const tomorrowDay = new Date(todayDay);
+      tomorrowDay.setDate(tomorrowDay.getDate() + 1);
+      
       active.forEach((t) => {
         if (t.submission_date) return;
         if (!t.task_start_date) {
@@ -305,13 +367,23 @@ class AssignTaskRepository {
           pending += 1;
           return;
         }
-        d.setHours(0, 0, 0, 0);
-        if (d.getTime() < todayDay.getTime()) {
+        // Pending: task_start_date >= today AND task_start_date < tomorrow AND submission_date IS NULL
+        if (d.getTime() >= todayDay.getTime() && d.getTime() < tomorrowDay.getTime()) {
+          pending += 1; // today's tasks with no submission
+        } else if (d.getTime() < todayDay.getTime()) {
           overdue += 1; // before today and no submission
-        } else if (d.getTime() === todayDay.getTime()) {
-          pending += 1; // exactly today and no submission
         }
       });
+
+      // Count upcoming tasks (tomorrow's tasks)
+      const upcomingTasks = all.filter((t) => {
+        if (!t.task_start_date) return false;
+        const d = new Date(t.task_start_date);
+        if (Number.isNaN(d.getTime())) return false;
+        d.setHours(0, 0, 0, 0);
+        return d.getTime() === tomorrowDay.getTime();
+      });
+      upcoming = upcomingTasks.length;
 
       const total = active.length;
       const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
@@ -320,13 +392,15 @@ class AssignTaskRepository {
         total,
         completed,
         pending,
-        not_done: notDone,
+        upcoming,
         overdue,
         progress_percent: progress
       };
     }
 
     // Active tasks: start date before today and no submission => overdue; start date on today and no submission => pending
+    // Overdue: task_start_date < today (strictly less than today, matching API logic)
+    // Pending: task_start_date >= today AND task_start_date < tomorrow AND submission_date IS NULL
     const sql = `
       WITH base AS (
         SELECT
@@ -340,31 +414,114 @@ class AssignTaskRepository {
         (SELECT count(*) FROM base WHERE status = 'yes') AS completed,
         (SELECT count(*) FROM base WHERE status = 'no') AS not_done,
         (SELECT count(*) FROM base WHERE submission_date IS NULL AND task_start_date::date < $1::date) AS overdue,
-        (SELECT count(*) FROM base WHERE submission_date IS NULL AND task_start_date::date = $1::date) AS pending,
+        (SELECT count(*) FROM assign_task WHERE task_start_date >= $1 AND task_start_date < $2 AND submission_date IS NULL) AS pending,
         (SELECT count(*) FROM base WHERE task_start_date::date <= $1::date) AS total;
     `;
 
     const today = new Date();
     today.setHours(0, 0, 0, 0); // use current local day as today
-    const todayDate = today.toISOString().slice(0, 10); // YYYY-MM-DD to avoid TZ drift in PG
+    const todayDate = formatLocalDateString(today); // Format as local YYYY-MM-DD
 
-    const result = await query(sql, [todayDate]);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDate = formatLocalDateString(tomorrow);
+
+    // SQL query uses $1 (todayDate) and $2 (tomorrowDate) for pending count
+    const result = await query(sql, [todayDate, tomorrowDate]);
     const row = result.rows[0] || {};
     const total = Number(row.total) || 0;
     const completed = Number(row.completed) || 0;
     const pending = Number(row.pending) || 0;
-    const notDone = Number(row.not_done) || 0;
     const overdue = Number(row.overdue) || 0;
+    
+    // Use countByDate method to get upcoming count (same as count endpoint)
+    const upcoming = await this.countByDate(tomorrow, {});
+    
     const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 
     return {
       total,
       completed,
       pending,
-      not_done: notDone,
+      upcoming,
       overdue,
       progress_percent: progress
     };
+  }
+
+  async countByDate(targetDate, options = {}) {
+    if (useMemory) {
+      const dayStart = new Date(targetDate);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      const count = this.records.filter((task) => {
+        if (!task || !task.task_start_date) return false;
+        const start = new Date(task.task_start_date);
+        if (Number.isNaN(start.getTime())) return false;
+        if (!matchesDepartment(task.department, options.department)) return false;
+        return start >= dayStart && start < dayEnd;
+      }).length;
+      return count;
+    }
+
+    const formattedDate = formatLocalDateString(targetDate);
+    if (!formattedDate) {
+      return 0;
+    }
+    const params = [formattedDate];
+    let sql = `
+      SELECT COUNT(*) as count
+      FROM assign_task
+      WHERE task_start_date::date = $1::date
+    `;
+
+    if (options.department) {
+      params.push(options.department);
+      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+    }
+
+    const result = await query(sql, params);
+    return Number(result.rows[0]?.count || 0);
+  }
+
+  async countOverdue(options = {}) {
+    if (useMemory) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const count = this.records.filter((task) => {
+        if (!task || !task.task_start_date) return false;
+        const start = new Date(task.task_start_date);
+        if (Number.isNaN(start.getTime())) return false;
+        start.setHours(0, 0, 0, 0);
+        if (start >= today) return false;
+        if (!matchesDepartment(task.department, options.department)) return false;
+        return !task.submission_date;
+      }).length;
+      return count;
+    }
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayDate = today.toISOString().slice(0, 10);
+    
+    const params = [todayDate];
+    let sql = `
+      SELECT COUNT(*) as count
+      FROM assign_task
+      WHERE submission_date IS NULL
+        AND task_start_date IS NOT NULL
+        AND task_start_date::date < $1::date
+    `;
+
+    if (options.department) {
+      params.push(options.department);
+      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+    }
+
+    const result = await query(sql, params);
+    return Number(result.rows[0]?.count || 0);
   }
 
   async findByDate(targetDate, options = {}) {
@@ -385,7 +542,7 @@ class AssignTaskRepository {
       const { limit, offset } = options;
       const startIdx = Number.isInteger(offset) && offset > 0 ? offset : 0;
       const endIdx = Number.isInteger(limit) && limit > 0 ? startIdx + limit : undefined;
-      return filtered.slice(startIdx, endIdx);
+      return filtered.slice(startIdx, endIdx).map(record => formatTaskDates(applyComputedDelay(record)));
     }
 
     const params = [targetDate];
@@ -416,7 +573,7 @@ class AssignTaskRepository {
     }
 
     const result = await query(sql, params);
-    return result.rows.map(applyComputedDelay);
+    return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
   }
 
   async create(input) {
@@ -472,7 +629,8 @@ class AssignTaskRepository {
     ];
 
     const result = await query(sql, params);
-    return result.rows[0];
+    const record = result.rows[0];
+    return record ? formatTaskDates(applyComputedDelay(record)) : undefined;
   }
 
   async update(id, input) {
@@ -538,7 +696,7 @@ class AssignTaskRepository {
     }
 
     if (setClauses.length === 0) {
-      return existing;
+      return existing ? formatTaskDates(applyComputedDelay(existing)) : null;
     }
 
     params.push(id);
@@ -589,7 +747,7 @@ class AssignTaskRepository {
       created_at: now
     };
     this.records.push(record);
-    return record;
+    return formatTaskDates(applyComputedDelay(record));
   }
 
   async updateInMemory(id, input) {
@@ -607,7 +765,7 @@ class AssignTaskRepository {
       base.hod = serializeHod(input.hod);
     }
     this.records[idx] = base;
-    return base;
+    return formatTaskDates(applyComputedDelay(base));
   }
 
   async deleteInMemory(id) {

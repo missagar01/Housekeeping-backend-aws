@@ -278,10 +278,10 @@ class AssignTaskService {
     };
   }
 
-  // Return all tasks with start date on/before yesterday and no submission
+  // Return all tasks with start date < today and no submission
   async overdue(options = {}) {
-    const endOfYesterday = getEndOfYesterday();
-    return assignTaskRepository.findOverdue(endOfYesterday, options);
+    // Use today's date for comparison (not endOfYesterday) to match user's SQL query
+    return assignTaskRepository.findOverdue(null, options);
   }
 
   // Return all tasks explicitly marked as not done (status "no")
@@ -298,6 +298,31 @@ class AssignTaskService {
     // strip time to avoid TZ issues in ::date comparison
     today.setHours(0, 0, 0, 0);
     return assignTaskRepository.findByDate(today, options);
+  }
+
+  tomorrow(options = {}) {
+    const tomorrow = new Date();
+    // strip time to avoid TZ issues in ::date comparison
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return assignTaskRepository.findByDate(tomorrow, options);
+  }
+
+  async countToday(options = {}) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return assignTaskRepository.countByDate(today, options);
+  }
+
+  async countTomorrow(options = {}) {
+    const tomorrow = new Date();
+    tomorrow.setHours(0, 0, 0, 0);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return assignTaskRepository.countByDate(tomorrow, options);
+  }
+
+  async countOverdue(options = {}) {
+    return assignTaskRepository.countOverdue(options);
   }
 
   pending(options = {}) {
