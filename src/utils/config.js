@@ -1,6 +1,8 @@
+const path = require('path');
 const dotenv = require('dotenv');
 
-dotenv.config({ quiet: true });
+const envPath = path.resolve(__dirname, '../../.env');
+dotenv.config({ path: envPath, quiet: true });
 
 const truthy = (v) => v === true || v === 'true' || v === '1';
 
