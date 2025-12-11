@@ -8,5 +8,6 @@ router.use(requireAuth);
 // router.use(requireAdmin);
 
 router.get('/summary', dashboardController.getSummary);
+router.get('/departments', dashboardController.getDepartments);
 
 module.exports = router;

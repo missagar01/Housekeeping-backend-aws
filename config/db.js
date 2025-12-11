@@ -4,6 +4,7 @@ const { logger } = require('../src/utils/logger');
 
 let pool;
 
+
 if (config.env !== 'test' && config.pg.host) {
   pool = new Pool({
     host: config.pg.host,

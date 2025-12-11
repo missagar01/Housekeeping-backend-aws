@@ -141,6 +141,9 @@ Example stats response (`GET /api/assigntask/generate/stats` or `/api/dashboard/
 
 ### Dashboard
 - `GET /api/dashboard/summary` — same stats as above, dedicated for frontend dashboards.
+- `GET /api/dashboard/departments` — list departments (sorted case-insensitive) for dropdowns. Use this value with the new `department` query on the dashboard and assign-task endpoints to scope the response per department.
+
+> **Tip:** append `?department=Store Office` (or other department value returned above) to `/api/dashboard/summary` and `/api/assigntask/generate/...` routes to make the dashboard cards, lists, and counts update per department.
 
 ### Users (`/api/users`)
 - `GET /api/users` — list users.

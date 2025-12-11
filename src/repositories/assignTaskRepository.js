@@ -162,6 +162,39 @@ class AssignTaskRepository {
     return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
   }
 
+  async listDepartments() {
+    if (useMemory) {
+      const departments = new Map();
+      this.records.forEach((record) => {
+        if (!record || !record.department) return;
+        const trimmed = String(record.department).trim();
+        if (!trimmed) return;
+        const key = trimmed.toLowerCase();
+        if (!departments.has(key)) {
+          departments.set(key, trimmed);
+        }
+      });
+      return Array.from(departments.values()).sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: 'base' })
+      );
+    }
+
+    const sql = `
+      SELECT department
+      FROM (
+        SELECT DISTINCT department
+        FROM assign_task
+        WHERE department IS NOT NULL
+          AND trim(department) <> ''
+      ) AS uniq
+      ORDER BY LOWER(department) ASC
+    `;
+    const result = await query(sql);
+    return result.rows
+      .map((row) => (typeof row.department === 'string' ? row.department.trim() : row.department))
+      .filter((department) => department);
+  }
+
   async findById(id) {
     if (useMemory) {
       const record = this.records.find((r) => String(r.id) === String(id));
@@ -327,13 +360,23 @@ class AssignTaskRepository {
     return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
   }
 
-  async aggregateStats(cutoff) {
+  async aggregateStats(cutoff, options = {}) {
+    const statsOptions = {};
+    const departmentFilter = normalizeDepartment(options.department);
+    if (departmentFilter) {
+      statsOptions.department = departmentFilter;
+    }
+
     if (useMemory) {
-      const all = await this.findAll();
-      const cutoffDay = new Date(cutoff);
+      const all = await this.findAll(statsOptions);
+      let referenceCutoff = cutoff ? new Date(cutoff) : new Date();
+      if (Number.isNaN(referenceCutoff.getTime())) {
+        referenceCutoff = new Date();
+      }
+      const cutoffDay = new Date(referenceCutoff);
       cutoffDay.setHours(0, 0, 0, 0);
       const todayDay = new Date(cutoffDay);
-      todayDay.setDate(todayDay.getDate() + 1); // cutoff is end of yesterday; todayDay is current day
+      todayDay.setDate(todayDay.getDate() + 1);
 
       const toLower = (v) => (v ? String(v).trim().toLowerCase() : '');
       const completed = all.filter((t) => toLower(t.status) === 'yes').length;
@@ -401,6 +444,28 @@ class AssignTaskRepository {
     // Active tasks: start date before today and no submission => overdue; start date on today and no submission => pending
     // Overdue: task_start_date < today (strictly less than today, matching API logic)
     // Pending: task_start_date >= today AND task_start_date < tomorrow AND submission_date IS NULL
+    let referenceDay = cutoff ? new Date(cutoff) : new Date();
+    if (Number.isNaN(referenceDay.getTime())) {
+      referenceDay = new Date();
+    }
+    referenceDay.setHours(0, 0, 0, 0);
+    const todayDay = new Date(referenceDay);
+    todayDay.setDate(todayDay.getDate() + 1);
+    const tomorrowDay = new Date(todayDay);
+    tomorrowDay.setDate(tomorrowDay.getDate() + 1);
+
+    const todayDate = formatLocalDateString(todayDay);
+    const tomorrowDate = formatLocalDateString(tomorrowDay);
+
+    const params = [todayDate, tomorrowDate];
+    let departmentClause = '';
+    if (departmentFilter) {
+      params.push(departmentFilter);
+      const index = params.length;
+      departmentClause = `
+        AND LOWER(department) = LOWER($${index})`;
+    }
+
     const sql = `
       WITH base AS (
         SELECT
@@ -409,25 +474,22 @@ class AssignTaskRepository {
           submission_date
         FROM assign_task
         WHERE task_start_date IS NOT NULL
+        ${departmentClause}
       )
       SELECT
         (SELECT count(*) FROM base WHERE status = 'yes') AS completed,
         (SELECT count(*) FROM base WHERE status = 'no') AS not_done,
         (SELECT count(*) FROM base WHERE submission_date IS NULL AND task_start_date::date < $1::date) AS overdue,
-        (SELECT count(*) FROM assign_task WHERE task_start_date >= $1 AND task_start_date < $2 AND submission_date IS NULL) AS pending,
+        (SELECT count(*) FROM assign_task
+          WHERE task_start_date >= $1
+            AND task_start_date < $2
+            AND submission_date IS NULL
+            ${departmentClause}
+        ) AS pending,
         (SELECT count(*) FROM base WHERE task_start_date::date <= $1::date) AS total;
     `;
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // use current local day as today
-    const todayDate = formatLocalDateString(today); // Format as local YYYY-MM-DD
-
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowDate = formatLocalDateString(tomorrow);
-
-    // SQL query uses $1 (todayDate) and $2 (tomorrowDate) for pending count
-    const result = await query(sql, [todayDate, tomorrowDate]);
+    const result = await query(sql, params);
     const row = result.rows[0] || {};
     const total = Number(row.total) || 0;
     const completed = Number(row.completed) || 0;
@@ -435,7 +497,7 @@ class AssignTaskRepository {
     const overdue = Number(row.overdue) || 0;
     
     // Use countByDate method to get upcoming count (same as count endpoint)
-    const upcoming = await this.countByDate(tomorrow, {});
+    const upcoming = await this.countByDate(tomorrowDay, statsOptions);
     
     const progress = total > 0 ? Math.round((completed / total) * 100) : 0;
 

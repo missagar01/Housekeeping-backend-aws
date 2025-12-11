@@ -9,9 +9,13 @@ const getEndOfYesterday = () => {
 };
 
 class DashboardService {
-  async summary() {
+  async summary(options = {}) {
     const cutoff = getEndOfYesterday();
-    return assignTaskService.aggregateStats(cutoff);
+    return assignTaskService.aggregateStats(cutoff, options);
+  }
+
+  async listDepartments() {
+    return assignTaskService.listDepartments();
   }
 }
 
