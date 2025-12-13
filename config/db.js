@@ -32,6 +32,7 @@ if (config.env !== 'test' && config.pg.host) {
   logger.warn('PG connection info missing; database pool not initialized');
 }
 
+
 const query = (text, params) => {
   if (!pool) {
     throw new Error('PostgreSQL pool not initialized');
