@@ -1,8 +1,35 @@
 const path = require('path');
 const dotenv = require('dotenv');
+const fs = require('fs');
 
-const envPath = path.resolve(__dirname, '../../.env');
-dotenv.config({ path: envPath, quiet: true });
+// Try multiple possible paths for .env file
+const possiblePaths = [
+  path.resolve(__dirname, '../../.env'), // From src/utils/config.js
+  path.resolve(process.cwd(), '.env'),   // Current working directory
+  path.join(process.cwd(), '.env')       // Alternative cwd path
+];
+
+let envPath = null;
+for (const envFile of possiblePaths) {
+  if (fs.existsSync(envFile)) {
+    envPath = envFile;
+    break;
+  }
+}
+
+if (envPath) {
+  const result = dotenv.config({ path: envPath });
+  if (result.error) {
+    console.warn(`Warning: Error loading .env from ${envPath}:`, result.error.message);
+  } else {
+    console.log(`Loaded .env from: ${envPath}`);
+  }
+} else {
+  console.warn('Warning: No .env file found. Tried paths:', possiblePaths.join(', '));
+  console.warn('Using environment variables from system or process.env');
+  // Still call dotenv.config() without path to load from environment
+  dotenv.config();
+}
 
 const truthy = (v) => v === true || v === 'true' || v === '1';
 
@@ -20,5 +47,17 @@ const config = {
   },
   jwtSecret: process.env.JWT_SECRET || 'change-me'
 };
+
+// Log config status (without sensitive data)
+if (config.env !== 'test') {
+  console.log('Database config:', {
+    host: config.pg.host ? '***' : 'MISSING',
+    port: config.pg.port,
+    user: config.pg.user ? '***' : 'MISSING',
+    database: config.pg.database ? '***' : 'MISSING',
+    ssl: config.pg.ssl,
+    envPath: envPath || 'NOT FOUND'
+  });
+}
 
 module.exports = { config };
