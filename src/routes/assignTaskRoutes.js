@@ -115,6 +115,14 @@ router.get('/generate/history', assignTaskController.history);
 
 // Mark an assignment as confirmed (stores marker in attachment column)
 router
+  .route('/generate/confirm/bulk')
+  .post(
+    confirmUpload, // allow optional image upload along with remark/attachment
+    assignTaskController.confirmAttachmentBulk
+  );
+
+// Mark an assignment as confirmed (stores marker in attachment column)
+router
   .route('/generate/:id/confirm')
   .post(
     confirmUpload, // allow optional image upload along with remark/attachment

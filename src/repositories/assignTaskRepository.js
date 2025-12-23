@@ -243,6 +243,19 @@ class AssignTaskRepository {
 
     sql += ' ORDER BY task_start_date ASC';
 
+    const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
+    const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
+
+    if (hasLimit) {
+      params.push(options.limit);
+      sql += ` LIMIT $${params.length}`;
+    }
+    if (hasOffset) {
+      if (!hasLimit) sql += ' LIMIT ALL';
+      params.push(options.offset);
+      sql += ` OFFSET $${params.length}`;
+    }
+
     const result = await query(sql, params);
     return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
   }
@@ -301,6 +314,19 @@ class AssignTaskRepository {
         id DESC
     `;
 
+    const hasLimit = Number.isInteger(options.limit) && options.limit > 0;
+    const hasOffset = Number.isInteger(options.offset) && options.offset > 0;
+
+    if (hasLimit) {
+      params.push(options.limit);
+      sql += ` LIMIT $${params.length}`;
+    }
+    if (hasOffset) {
+      if (!hasLimit) sql += ' LIMIT ALL';
+      params.push(options.offset);
+      sql += ` OFFSET $${params.length}`;
+    }
+
     const result = await query(sql, params);
     return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
   }
@@ -358,6 +384,53 @@ class AssignTaskRepository {
 
     const result = await query(sql, params);
     return result.rows.map(record => formatTaskDates(applyComputedDelay(record)));
+  }
+
+  async countPending(cutoff, options = {}) {
+    const effectiveCutoff = cutoff || new Date();
+    const params = [effectiveCutoff];
+    let sql = `
+      SELECT COUNT(*) as count
+      FROM assign_task
+      WHERE submission_date IS NULL
+        AND task_start_date IS NOT NULL
+        AND task_start_date::date <= $1::date
+    `;
+
+    if (options.department) {
+      params.push(options.department);
+      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+    }
+    if (options.assignedTo) {
+      params.push(options.assignedTo);
+      sql += ` AND (LOWER(name) = LOWER($${params.length}) OR LOWER(doer_name2) = LOWER($${params.length}))`;
+    }
+
+    const result = await query(sql, params);
+    return Number(result.rows[0]?.count || 0);
+  }
+
+  async countHistory(cutoff, options = {}) {
+    const params = [cutoff];
+    let sql = `
+      SELECT COUNT(*) as count
+      FROM assign_task
+      WHERE submission_date IS NOT NULL
+        AND task_start_date IS NOT NULL
+        AND task_start_date <= $1
+    `;
+
+    if (options.department) {
+      params.push(options.department);
+      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+    }
+    if (options.assignedTo) {
+      params.push(options.assignedTo);
+      sql += ` AND (LOWER(name) = LOWER($${params.length}) OR LOWER(doer_name2) = LOWER($${params.length}))`;
+    }
+
+    const result = await query(sql, params);
+    return Number(result.rows[0]?.count || 0);
   }
 
   async aggregateStats(cutoff, options = {}) {

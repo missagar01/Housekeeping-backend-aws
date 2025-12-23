@@ -340,6 +340,22 @@ class AssignTaskService {
     cutoff.setHours(23, 59, 59, 999); // include up to today
     return assignTaskRepository.findHistory(cutoff, options);
   }
+
+  async pendingWithTotal(options = {}) {
+    const cutoff = new Date();
+    cutoff.setHours(23, 59, 59, 999); // include up to today
+    const items = await assignTaskRepository.findPending(cutoff, options);
+    const total = await assignTaskRepository.countPending(cutoff, options);
+    return { items, total };
+  }
+
+  async historyWithTotal(options = {}) {
+    const cutoff = new Date();
+    cutoff.setHours(23, 59, 59, 999); // include up to today
+    const items = await assignTaskRepository.findHistory(cutoff, options);
+    const total = await assignTaskRepository.countHistory(cutoff, options);
+    return { items, total };
+  }
 }
 
 const assignTaskService = new AssignTaskService();

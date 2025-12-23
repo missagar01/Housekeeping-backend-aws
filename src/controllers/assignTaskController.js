@@ -301,12 +301,19 @@ const assignTaskController = {
       const effectiveOffset = page && limit ? (page - 1) * limit : offset;
       const department = req.query?.department;
 
-      const items = await assignTaskService.pending({
+      const { items, total } = await assignTaskService.pendingWithTotal({
         limit,
         offset: effectiveOffset,
         department
       });
-      res.json(items);
+      res.json({
+        items,
+        total,
+        limit,
+        offset: effectiveOffset,
+        page,
+        hasMore: effectiveOffset + items.length < total
+      });
     } catch (err) {
       next(err);
     }
@@ -320,12 +327,19 @@ const assignTaskController = {
       const effectiveOffset = page && limit ? (page - 1) * limit : offset;
       const department = req.query?.department;
 
-      const items = await assignTaskService.history({
+      const { items, total } = await assignTaskService.historyWithTotal({
         limit,
         offset: effectiveOffset,
         department
       });
-      res.json(items);
+      res.json({
+        items,
+        total,
+        limit,
+        offset: effectiveOffset,
+        page,
+        hasMore: effectiveOffset + items.length < total
+      });
     } catch (err) {
       next(err);
     }
@@ -371,6 +385,74 @@ const assignTaskController = {
       const updated = await assignTaskService.update(req.params.id, payload);
       if (!updated) throw new ApiError(404, 'Assignment not found');
       res.json(uploadedMeta ? { ...updated, uploaded_image: uploadedMeta } : updated);
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async confirmAttachmentBulk(req, res, next) {
+    try {
+      const body = typeof req.body === 'string' ? safeJsonParse(req.body) : (req.body || {});
+      const rawIds = Array.isArray(body.ids) ? body.ids : (body.id ? [body.id] : []);
+      const ids = rawIds
+        .map((v) => (v !== undefined && v !== null ? String(v).trim() : ''))
+        .filter(Boolean);
+
+      if (ids.length === 0) {
+        throw new ApiError(400, 'ids array is required for bulk confirm');
+      }
+
+      const fileFromFields =
+        req.file ||
+        (req.files && Array.isArray(req.files) && req.files[0]) ||
+        (req.files && req.files.image && req.files.image[0]) ||
+        (req.files && req.files.upload && req.files.upload[0]);
+
+      const uploadedImage = toUploadedPath(req, fileFromFields);
+      const uploadedMeta = toUploadedMeta(req, fileFromFields);
+
+      const payload = {};
+      if (uploadedImage) {
+        payload.image = uploadedImage;
+      }
+
+      const attachmentValue = extractAttachment(body, req.query);
+      payload.attachment = attachmentValue !== undefined && attachmentValue !== null
+        ? String(attachmentValue)
+        : 'confirmed';
+
+      const explicitRemark = Object.prototype.hasOwnProperty.call(body, 'remark')
+        ? body.remark
+        : undefined;
+      const remarkValue = explicitRemark !== undefined ? explicitRemark : extractRemark(body, req.query);
+      if (remarkValue !== undefined && remarkValue !== null) {
+        payload.remark = String(remarkValue);
+      }
+
+      const doerName2Value = extractDoerName2(body, req.query);
+      if (doerName2Value !== undefined && doerName2Value !== null) {
+        payload.doer_name2 = String(doerName2Value);
+      }
+
+      const successes = [];
+      const failures = [];
+
+      for (const id of ids) {
+        // eslint-disable-next-line no-await-in-loop
+        const updated = await assignTaskService.update(id, payload);
+        if (updated) {
+          successes.push(uploadedMeta ? { ...updated, uploaded_image: uploadedMeta } : updated);
+        } else {
+          failures.push({ id, error: 'Not found' });
+        }
+      }
+
+      res.json({
+        updated: successes.length,
+        failed: failures.length,
+        items: successes,
+        failures
+      });
     } catch (err) {
       next(err);
     }
