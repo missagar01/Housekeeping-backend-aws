@@ -4,9 +4,10 @@ const fs = require('fs');
 
 // Try multiple possible paths for .env file
 const possiblePaths = [
-  path.resolve(__dirname, '../../.env'), // From src/utils/config.js
+  path.resolve(__dirname, '../../.env'), // From src/utils/config.js -> backend/.env
   path.resolve(process.cwd(), '.env'),   // Current working directory
-  path.join(process.cwd(), '.env')       // Alternative cwd path
+  path.join(__dirname, '../../.env'),     // Alternative relative path
+  '.env'                                  // Current directory (fallback)
 ];
 
 let envPath = null;
@@ -22,11 +23,15 @@ if (envPath) {
   if (result.error) {
     console.warn(`Warning: Error loading .env from ${envPath}:`, result.error.message);
   } else {
-    console.log(`Loaded .env from: ${envPath}`);
+    console.log(`✓ Loaded .env from: ${envPath}`);
   }
 } else {
-  console.warn('Warning: No .env file found. Tried paths:', possiblePaths.join(', '));
-  console.warn('Using environment variables from system or process.env');
+  // Only warn once, not on every require
+  if (!process.env._ENV_WARNED) {
+    console.warn('⚠️  No .env file found. Tried paths:', possiblePaths.join(', '));
+    console.warn('Using environment variables from system or process.env');
+    process.env._ENV_WARNED = 'true';
+  }
   // Still call dotenv.config() without path to load from environment
   dotenv.config();
 }

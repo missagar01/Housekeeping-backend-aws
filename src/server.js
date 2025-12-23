@@ -2,7 +2,7 @@ const { createServer } = require('http');
 const app = require('./app');
 const { config } = require('./utils/config');
 const { logger } = require('./utils/logger');
-const { initializePool } = require('../../config/db');
+const { initializePool } = require('../config/db');
 
 const server = createServer(app);
 const port = config.port;

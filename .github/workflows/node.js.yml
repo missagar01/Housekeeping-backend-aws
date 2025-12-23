@@ -64,7 +64,17 @@ jobs:
         run: |
           echo "Syncing code to $DEPLOY_DIR ..."
           mkdir -p "$DEPLOY_DIR"
-          rsync -av --delete --exclude '.git' --exclude 'node_modules' ./ "$DEPLOY_DIR"/
+          # Preserve .env file if it exists
+          if [ -f "$DEPLOY_DIR/.env" ]; then
+            echo "Backing up existing .env file..."
+            cp "$DEPLOY_DIR/.env" "$DEPLOY_DIR/.env.backup"
+          fi
+          rsync -av --delete --exclude '.git' --exclude 'node_modules' --exclude '.env' ./ "$DEPLOY_DIR"/
+          # Restore .env backup if it existed
+          if [ -f "$DEPLOY_DIR/.env.backup" ]; then
+            mv "$DEPLOY_DIR/.env.backup" "$DEPLOY_DIR/.env"
+            echo "Restored .env file"
+          fi
 
       - name: "🚀 Deploy with PM2 (src/server.js)"
         shell: bash
@@ -80,8 +90,10 @@ jobs:
 
           cd "$DEPLOY_DIR"
 
-          echo "Writing .env from workflow secrets..."
-          cat > .env <<EOF
+          # Only create .env if it doesn't exist, otherwise preserve existing one
+          if [ ! -f .env ]; then
+            echo "Creating .env from workflow secrets..."
+            cat > .env <<EOF
           NODE_ENV=${NODE_ENV}
           PORT=${PORT}
           LOG_LEVEL=${LOG_LEVEL}
@@ -103,18 +115,26 @@ jobs:
           JWT_SECRET=${JWT_SECRET}
           JWT_EXPIRES_IN=${JWT_EXPIRES_IN}
           EOF
+          else
+            echo "✓ .env file already exists, preserving it..."
+          fi
 
           npm ci
 
+          # Stop existing process if running from wrong directory
           if pm2 describe "${APP_NAME}" >/dev/null 2>&1; then
-            echo "🌀 Existing PM2 process मिला, reload कर रहे हैं…"
-            pm2 reload "${APP_NAME}" --update-env
-          else
-            echo "✨ PM2 process नहीं मिला, नया start कर रहे हैं…"
-            pm2 start "$DEPLOY_DIR/src/server.js" --name "${APP_NAME}"
+            echo "🌀 Existing PM2 process मिला, stopping..."
+            pm2 stop "${APP_NAME}" || true
+            pm2 delete "${APP_NAME}" || true
           fi
+
+          echo "✨ Starting PM2 process from $DEPLOY_DIR..."
+          pm2 start "$DEPLOY_DIR/src/server.js" --name "${APP_NAME}" --update-env
 
           pm2 save || true
 
           echo "✅ PM2 status:"
           pm2 status
+          
+          echo "✅ PM2 logs (last 20 lines):"
+          pm2 logs "${APP_NAME}" --lines 20 --nostream || true
