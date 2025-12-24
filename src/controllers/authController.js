@@ -17,7 +17,8 @@ const authController = {
           id: user.id,
           user_name: user.user_name,
           email: user.email_id || null,
-          role: user.role || null
+          role: user.role || null,
+          user_access: user.user_access || null
         },
         config.jwtSecret,
         { expiresInDays: 30 }
@@ -31,7 +32,8 @@ const authController = {
           id: user.id,
           user_name: user.user_name,
           email: user.email_id || null,
-          role: user.role || null
+          role: user.role || null,
+          user_access: user.user_access || null
         }
       });
     } catch (err) {

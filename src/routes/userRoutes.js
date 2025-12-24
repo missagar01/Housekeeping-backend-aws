@@ -9,6 +9,8 @@ const router = Router();
 // router.use(requireAuth);
 router.use(requireAdmin);
 
+router.get('/departments', userController.listDepartments);
+
 router
   .route('/')
   .get(userController.list)

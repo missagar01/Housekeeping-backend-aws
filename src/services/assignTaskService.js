@@ -164,6 +164,10 @@ class AssignTaskService {
     return assignTaskRepository.delete(id);
   }
 
+  deleteMany(ids = []) {
+    return assignTaskRepository.deleteMany(ids);
+  }
+
   async listDepartments() {
     return assignTaskRepository.listDepartments();
   }

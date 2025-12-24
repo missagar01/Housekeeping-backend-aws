@@ -26,6 +26,15 @@ const userController = {
     }
   },
 
+  async listDepartments(_req, res, next) {
+    try {
+      const data = await userService.listDepartments();
+      res.json(data);
+    } catch (err) {
+      next(err);
+    }
+  },
+
   async getById(req, res, next) {
     try {
       const user = await userService.getById(req.params.id);
@@ -58,5 +67,4 @@ const userController = {
 };
 
 module.exports = { userController };
-
 

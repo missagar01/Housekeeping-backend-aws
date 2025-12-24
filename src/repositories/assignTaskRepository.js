@@ -79,6 +79,16 @@ const serializeHod = (value) => {
 
 const normalizeDepartment = (value) => (typeof value === 'string' ? value.trim().toLowerCase() : '');
 const matchesDepartment = (recordDept, filterDept) => {
+  if (!filterDept) return true;
+  
+  // Handle array of departments (multiple departments from user_access)
+  if (Array.isArray(filterDept)) {
+    if (filterDept.length === 0) return true;
+    const normalizedRecord = normalizeDepartment(recordDept);
+    return filterDept.some(dept => normalizeDepartment(dept) === normalizedRecord);
+  }
+  
+  // Handle single department (string)
   const normalizedFilter = normalizeDepartment(filterDept);
   if (!normalizedFilter) return true;
   return normalizeDepartment(recordDept) === normalizedFilter;
@@ -135,7 +145,7 @@ class AssignTaskRepository {
 
     if (options.department) {
       params.push(options.department);
-      where.push(`LOWER(department) = LOWER($${params.length})`);
+      where.push(`LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`);
     }
 
     let sql = 'SELECT * FROM assign_task';
@@ -237,8 +247,19 @@ class AssignTaskRepository {
     `;
 
     if (options.department) {
-      params.push(options.department);
-      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+      // Handle multiple departments (array) or single department (string)
+      if (Array.isArray(options.department) && options.department.length > 0) {
+        // Use IN clause for multiple departments
+        const placeholders = options.department.map((_, idx) => {
+          params.push(options.department[idx]);
+          return `LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+        }).join(', ');
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) IN (${placeholders})`;
+      } else if (typeof options.department === 'string') {
+        // Single department
+        params.push(options.department);
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+      }
     }
 
     sql += ' ORDER BY task_start_date ASC';
@@ -298,8 +319,19 @@ class AssignTaskRepository {
     `;
 
     if (options.department) {
-      params.push(options.department);
-      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+      // Handle multiple departments (array) or single department (string)
+      if (Array.isArray(options.department) && options.department.length > 0) {
+        // Use IN clause for multiple departments
+        const placeholders = options.department.map((_, idx) => {
+          params.push(options.department[idx]);
+          return `LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+        }).join(', ');
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) IN (${placeholders})`;
+      } else if (typeof options.department === 'string') {
+        // Single department
+        params.push(options.department);
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+      }
     }
     if (options.assignedTo) {
       params.push(options.assignedTo);
@@ -359,8 +391,19 @@ class AssignTaskRepository {
     `;
 
     if (options.department) {
-      params.push(options.department);
-      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+      // Handle multiple departments (array) or single department (string)
+      if (Array.isArray(options.department) && options.department.length > 0) {
+        // Use IN clause for multiple departments
+        const placeholders = options.department.map((_, idx) => {
+          params.push(options.department[idx]);
+          return `LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+        }).join(', ');
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) IN (${placeholders})`;
+      } else if (typeof options.department === 'string') {
+        // Single department
+        params.push(options.department);
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+      }
     }
     if (options.assignedTo) {
       params.push(options.assignedTo);
@@ -398,8 +441,19 @@ class AssignTaskRepository {
     `;
 
     if (options.department) {
-      params.push(options.department);
-      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+      // Handle multiple departments (array) or single department (string)
+      if (Array.isArray(options.department) && options.department.length > 0) {
+        // Use IN clause for multiple departments
+        const placeholders = options.department.map((_, idx) => {
+          params.push(options.department[idx]);
+          return `LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+        }).join(', ');
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) IN (${placeholders})`;
+      } else if (typeof options.department === 'string') {
+        // Single department
+        params.push(options.department);
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+      }
     }
     if (options.assignedTo) {
       params.push(options.assignedTo);
@@ -421,8 +475,19 @@ class AssignTaskRepository {
     `;
 
     if (options.department) {
-      params.push(options.department);
-      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+      // Handle multiple departments (array) or single department (string)
+      if (Array.isArray(options.department) && options.department.length > 0) {
+        // Use IN clause for multiple departments
+        const placeholders = options.department.map((_, idx) => {
+          params.push(options.department[idx]);
+          return `LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+        }).join(', ');
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) IN (${placeholders})`;
+      } else if (typeof options.department === 'string') {
+        // Single department
+        params.push(options.department);
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+      }
     }
     if (options.assignedTo) {
       params.push(options.assignedTo);
@@ -536,7 +601,7 @@ class AssignTaskRepository {
       params.push(departmentFilter);
       const index = params.length;
       departmentClause = `
-        AND LOWER(department) = LOWER($${index})`;
+        AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${index}), '\\\\s+', ' ', 'g'))`;
     }
 
     const sql = `
@@ -613,8 +678,19 @@ class AssignTaskRepository {
     `;
 
     if (options.department) {
-      params.push(options.department);
-      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+      // Handle multiple departments (array) or single department (string)
+      if (Array.isArray(options.department) && options.department.length > 0) {
+        // Use IN clause for multiple departments
+        const placeholders = options.department.map((_, idx) => {
+          params.push(options.department[idx]);
+          return `LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+        }).join(', ');
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) IN (${placeholders})`;
+      } else if (typeof options.department === 'string') {
+        // Single department
+        params.push(options.department);
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+      }
     }
 
     const result = await query(sql, params);
@@ -651,8 +727,19 @@ class AssignTaskRepository {
     `;
 
     if (options.department) {
-      params.push(options.department);
-      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+      // Handle multiple departments (array) or single department (string)
+      if (Array.isArray(options.department) && options.department.length > 0) {
+        // Use IN clause for multiple departments
+        const placeholders = options.department.map((_, idx) => {
+          params.push(options.department[idx]);
+          return `LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+        }).join(', ');
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) IN (${placeholders})`;
+      } else if (typeof options.department === 'string') {
+        // Single department
+        params.push(options.department);
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+      }
     }
 
     const result = await query(sql, params);
@@ -688,8 +775,19 @@ class AssignTaskRepository {
     `;
 
     if (options.department) {
-      params.push(options.department);
-      sql += ` AND LOWER(department) = LOWER($${params.length})`;
+      // Handle multiple departments (array) or single department (string)
+      if (Array.isArray(options.department) && options.department.length > 0) {
+        // Use IN clause for multiple departments
+        const placeholders = options.department.map((_, idx) => {
+          params.push(options.department[idx]);
+          return `LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+        }).join(', ');
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) IN (${placeholders})`;
+      } else if (typeof options.department === 'string') {
+        // Single department
+        params.push(options.department);
+        sql += ` AND LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+      }
     }
 
     sql += ' ORDER BY id ASC';
@@ -853,6 +951,40 @@ class AssignTaskRepository {
     }
     const result = await query('DELETE FROM assign_task WHERE id = $1', [id]);
     return result.rowCount > 0;
+  }
+
+  async deleteMany(ids = []) {
+    const normalized = Array.isArray(ids)
+      ? ids.map((value) => (value !== undefined && value !== null ? String(value).trim() : '')).filter(Boolean)
+      : [];
+
+    if (normalized.length === 0) {
+      return 0;
+    }
+
+    if (useMemory) {
+      const idSet = new Set(normalized);
+      const before = this.records.length;
+      this.records = this.records.filter((record) => {
+        const idMatch = idSet.has(String(record?.id));
+        const taskIdMatch = idSet.has(String(record?.task_id));
+        return !(idMatch || taskIdMatch);
+      });
+      return before - this.records.length;
+    }
+
+    const numericIds = normalized
+      .map((value) => Number(value))
+      .filter((value) => Number.isInteger(value));
+
+    const params = [numericIds, normalized];
+    const sql = `
+      DELETE FROM assign_task
+      WHERE id = ANY($1::int[])
+         OR task_id = ANY($2::text[])
+    `;
+    const result = await query(sql, params);
+    return result.rowCount || 0;
   }
 
   async createInMemory(input) {

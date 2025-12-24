@@ -1,8 +1,9 @@
 const { query } = require('../../config/db');
+
 class UserRepository {
   async findByUsername(userName) {
     const result = await query(
-      'SELECT id, user_name, password, role, email_id FROM users WHERE user_name = $1 LIMIT 1',
+      'SELECT id, user_name, password, role, email_id, department, user_access FROM users WHERE user_name = $1 LIMIT 1',
       [userName]
     );
     return result.rows[0] || null;
@@ -81,11 +82,9 @@ class UserRepository {
       }
     });
 
-    // always update timestamp
     setClauses.push(`updated_at = NOW()`);
 
     if (setClauses.length === 1) {
-      // only updated_at would be set; return current record
       return this.findById(id);
     }
 
@@ -104,6 +103,19 @@ class UserRepository {
   async delete(id) {
     const result = await query('DELETE FROM users WHERE id = $1', [id]);
     return result.rowCount > 0;
+  }
+
+  async listByDepartment() {
+    const result = await query(
+      `SELECT
+         id,
+         user_name,
+         department
+       FROM users
+       WHERE department IS NOT NULL AND trim(department) <> ''
+       ORDER BY LOWER(department), user_name`
+    );
+    return result.rows;
   }
 }
 

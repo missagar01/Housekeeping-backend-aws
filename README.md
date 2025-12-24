@@ -91,11 +91,18 @@ npm start     # node src/server.js
 - `PATCH /api/assigntask/generate/:id` — update one (multipart supported).
 - `POST /api/assigntask/generate/:id/confirm` — mark a task as confirmed (writes `attachment = "confirmed"`).
 - `DELETE /api/assigntask/generate/:id` — delete one.
+- `POST /api/assigntask/generate/delete` — bulk delete (accepts `ids` array or comma-separated string).
 - `GET /api/assigntask/generate/stats` — totals (total/completed/pending/not done/overdue/progress%).
 - `GET /api/assigntask/generate/overdue` — tasks before/through yesterday with no submission.
 - `GET /api/assigntask/generate/not-done` — tasks marked `status = "no"`.
 - `GET /api/assigntask/generate/today` — tasks whose `task_start_date` is today.
 - Optional query: `limit`, `page` or `offset`, and `department` (for list/overdue/today/not-done).
+
+**Pending / History (department-scoped by token):**
+- `GET /api/assigntask/generate/pending` — returns pending tasks.
+- `GET /api/assigntask/generate/history` — returns completed tasks.
+  - If the logged-in user has role `user`, the API uses `req.user.department` from the JWT and ignores any `department` query so only that department's data is returned.
+  - For non-`user` roles, you can pass `?department=...` to filter.
 
 Example list response (`GET /api/assigntask/generate?limit=2`):
 ```json
@@ -203,6 +210,19 @@ Login:
 curl -X POST http://localhost:3005/api/auth/login \
   -H "Content-Type: application/json" \
   -d '{"user_name":"admin","password":"Welcome@1234d"}'
+```
+
+Pending (token-scoped for role `user`):
+```bash
+curl -X GET http://localhost:3005/api/assigntask/generate/pending \
+  -H "Authorization: Bearer <token>"
+```
+
+Bulk delete:
+```bash
+curl -X POST http://localhost:3005/api/assigntask/generate/delete \
+  -H "Content-Type: application/json" \
+  -d '{"ids":[1,2,"3"]}'
 ```
 
 ## Postman tips

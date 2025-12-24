@@ -113,6 +113,8 @@ router.get('/generate/pending', assignTaskController.pending);
 
 router.get('/generate/history', assignTaskController.history);
 
+router.post('/generate/delete', assignTaskController.deleteBulk);
+
 // Mark an assignment as confirmed (stores marker in attachment column)
 router
   .route('/generate/confirm/bulk')

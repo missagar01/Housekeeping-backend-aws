@@ -61,6 +61,42 @@ const extractRemark = (body = {}, query = {}) => {
   return found;
 };
 
+const normalizeDepartmentValue = (value) => {
+  if (typeof value !== 'string') return '';
+  return value.replace(/\s+/g, ' ').trim();
+};
+
+const parseDepartments = (value) => {
+  if (!value) return [];
+  if (typeof value !== 'string') return Array.isArray(value) ? value.map(normalizeDepartmentValue).filter(Boolean) : [];
+  
+  // Handle comma-separated departments
+  return value
+    .split(',')
+    .map(d => normalizeDepartmentValue(d))
+    .filter(Boolean);
+};
+
+const resolveDepartment = (req) => {
+  const role = req.user?.role ? String(req.user.role).toLowerCase() : '';
+  if (role === 'user') {
+    const userAccess = req.user?.user_access || req.user?.userAccess || req.user?.department || '';
+    const departments = parseDepartments(userAccess);
+    if (departments.length === 0) {
+      throw new ApiError(400, 'User access department missing');
+    }
+    // Return array for multiple departments, or single string for backward compatibility
+    return departments.length === 1 ? departments[0] : departments;
+  }
+
+  const queryDept = req.query?.department;
+  if (!queryDept) return null;
+  
+  // Check if query param is comma-separated
+  const departments = parseDepartments(queryDept);
+  return departments.length === 1 ? departments[0] : (departments.length > 1 ? departments : null);
+};
+
 const extractAttachment = (body = {}, query = {}) => {
   const candidates = [
     body.attachment,
@@ -86,6 +122,7 @@ const extractDoerName2 = (body = {}, query = {}) => {
   if (Buffer.isBuffer(found)) return found.toString();
   return found;
 };
+
 
 const prepareCreatePayload = (payload = {}) => {
   const frequency = normalizeFrequency(payload.frequency, { defaultValue: 'daily' });
@@ -299,21 +336,30 @@ const assignTaskController = {
       const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
       const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
       const effectiveOffset = page && limit ? (page - 1) * limit : offset;
-      const department = req.query?.department;
+      const department = resolveDepartment(req);
 
       const { items, total } = await assignTaskService.pendingWithTotal({
         limit,
         offset: effectiveOffset,
         department
       });
-      res.json({
+      const payload = {
         items,
         total,
         limit,
         offset: effectiveOffset,
         page,
         hasMore: effectiveOffset + items.length < total
-      });
+      };
+      if (req.query?.debug === '1') {
+        payload.meta = {
+          role: req.user?.role || null,
+          department_used: department || null,
+          token_department: normalizeDepartmentValue(req.user?.department) || null,
+          token_access: normalizeDepartmentValue(req.user?.user_access) || null
+        };
+      }
+      res.json(payload);
     } catch (err) {
       next(err);
     }
@@ -325,21 +371,30 @@ const assignTaskController = {
       const offset = parsePositiveInt(req.query?.offset, { defaultValue: 0 });
       const page = parsePositiveInt(req.query?.page, { defaultValue: 1 });
       const effectiveOffset = page && limit ? (page - 1) * limit : offset;
-      const department = req.query?.department;
+      const department = resolveDepartment(req);
 
       const { items, total } = await assignTaskService.historyWithTotal({
         limit,
         offset: effectiveOffset,
         department
       });
-      res.json({
+      const payload = {
         items,
         total,
         limit,
         offset: effectiveOffset,
         page,
         hasMore: effectiveOffset + items.length < total
-      });
+      };
+      if (req.query?.debug === '1') {
+        payload.meta = {
+          role: req.user?.role || null,
+          department_used: department || null,
+          token_department: normalizeDepartmentValue(req.user?.department) || null,
+          token_access: normalizeDepartmentValue(req.user?.user_access) || null
+        };
+      }
+      res.json(payload);
     } catch (err) {
       next(err);
     }
@@ -453,6 +508,38 @@ const assignTaskController = {
         items: successes,
         failures
       });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  async deleteBulk(req, res, next) {
+    try {
+      const body = typeof req.body === 'string' ? safeJsonParse(req.body) : (req.body || {});
+      let raw = body.ids ?? body.id ?? body.task_id ?? body.task_ids;
+      if (raw === undefined || raw === null) {
+        throw new ApiError(400, 'ids array is required for bulk delete');
+      }
+
+      let ids;
+      if (Array.isArray(raw)) {
+        ids = raw;
+      } else if (typeof raw === 'string') {
+        ids = raw.split(',');
+      } else {
+        ids = [raw];
+      }
+
+      const normalized = ids
+        .map((value) => (value !== undefined && value !== null ? String(value).trim() : ''))
+        .filter(Boolean);
+
+      if (normalized.length === 0) {
+        throw new ApiError(400, 'ids array is required for bulk delete');
+      }
+
+      const deleted = await assignTaskService.deleteMany(normalized);
+      res.json({ deleted });
     } catch (err) {
       next(err);
     }

@@ -20,6 +20,10 @@ class UserService {
   remove(id) {
     return userRepository.delete(id);
   }
+
+  listDepartments() {
+    return userRepository.listByDepartment();
+  }
 }
 
 const userService = new UserService();
