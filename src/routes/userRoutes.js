@@ -6,10 +6,11 @@ const { requireAuth, requireAdmin } = require('../middleware/auth');
 
 const router = Router();
 
-// router.use(requireAuth);
-router.use(requireAdmin);
+// Allow all authenticated users to get departments (needed for AssignTask form)
+router.get('/departments', requireAuth, userController.listDepartments);
 
-router.get('/departments', userController.listDepartments);
+// Admin-only routes
+router.use(requireAdmin);
 
 router
   .route('/')

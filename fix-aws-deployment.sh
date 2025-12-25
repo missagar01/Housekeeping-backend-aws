@@ -50,3 +50,4 @@ echo "📋 To view logs:"
 echo "pm2 logs ${APP_NAME}"
 
 
+

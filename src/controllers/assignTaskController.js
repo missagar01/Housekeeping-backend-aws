@@ -70,31 +70,41 @@ const parseDepartments = (value) => {
   if (!value) return [];
   if (typeof value !== 'string') return Array.isArray(value) ? value.map(normalizeDepartmentValue).filter(Boolean) : [];
   
-  // Handle comma-separated departments
+  // Handle comma-separated departments - split by comma and normalize each
   return value
     .split(',')
-    .map(d => normalizeDepartmentValue(d))
-    .filter(Boolean);
+    .map(d => {
+      // Normalize: trim and replace multiple spaces with single space
+      const normalized = d.replace(/\s+/g, ' ').trim();
+      return normalized;
+    })
+    .filter(Boolean); // Remove empty strings
 };
 
 const resolveDepartment = (req) => {
-  const role = req.user?.role ? String(req.user.role).toLowerCase() : '';
-  if (role === 'user') {
-    const userAccess = req.user?.user_access || req.user?.userAccess || req.user?.department || '';
+  // Prioritize user_access from token for all roles (if available)
+  const userAccess = req.user?.user_access || req.user?.userAccess || req.user?.department || '';
+  if (userAccess) {
     const departments = parseDepartments(userAccess);
-    if (departments.length === 0) {
-      throw new ApiError(400, 'User access department missing');
+    if (departments.length > 0) {
+      // Always return array for consistency - repository methods handle both array and string
+      return departments;
     }
-    // Return array for multiple departments, or single string for backward compatibility
-    return departments.length === 1 ? departments[0] : departments;
   }
 
+  const role = req.user?.role ? String(req.user.role).toLowerCase() : '';
+  // For user role, require user_access
+  if (role === 'user') {
+    throw new ApiError(400, 'User access department missing');
+  }
+
+  // For other roles, fall back to query parameter
   const queryDept = req.query?.department;
   if (!queryDept) return null;
   
   // Check if query param is comma-separated
   const departments = parseDepartments(queryDept);
-  return departments.length === 1 ? departments[0] : (departments.length > 1 ? departments : null);
+  return departments.length > 0 ? departments : null;
 };
 
 const extractAttachment = (body = {}, query = {}) => {

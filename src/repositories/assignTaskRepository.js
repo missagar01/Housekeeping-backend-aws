@@ -144,8 +144,19 @@ class AssignTaskRepository {
     const where = [];
 
     if (options.department) {
-      params.push(options.department);
-      where.push(`LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`);
+      // Handle multiple departments (array) or single department (string)
+      if (Array.isArray(options.department) && options.department.length > 0) {
+        // Use IN clause for multiple departments
+        const placeholders = options.department.map((_, idx) => {
+          params.push(options.department[idx]);
+          return `LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`;
+        }).join(', ');
+        where.push(`LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) IN (${placeholders})`);
+      } else if (typeof options.department === 'string') {
+        // Single department
+        params.push(options.department);
+        where.push(`LOWER(REGEXP_REPLACE(TRIM(department), '\\\\s+', ' ', 'g')) = LOWER(REGEXP_REPLACE(TRIM($${params.length}), '\\\\s+', ' ', 'g'))`);
+      }
     }
 
     let sql = 'SELECT * FROM assign_task';
